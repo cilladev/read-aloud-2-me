@@ -15,6 +15,11 @@ export interface HighlightView {
 }
 
 const EMPTY: HighlightView = { sentence: undefined, word: undefined, read: undefined };
+const ALL_PARTS = { sentence: true, word: true, read: true };
+
+function sameRange(a: SourceRange | undefined, b: SourceRange | undefined): boolean {
+  return a?.start === b?.start && a?.end === b?.end;
+}
 
 /** Owns the three decoration types and the document they apply to. */
 export class EditorHighlighter implements vscode.Disposable {
@@ -51,10 +56,15 @@ export class EditorHighlighter implements vscode.Disposable {
     this.document = document;
   }
 
-  /** Updates the marks. Pass undefined parts to remove them. */
+  /** Updates the marks. Pass undefined parts to remove them. Only parts that changed are redrawn. */
   show(view: HighlightView): void {
+    const previous = this.view;
     this.view = view;
-    this.apply();
+    this.apply({
+      sentence: !sameRange(previous.sentence, view.sentence),
+      word: !sameRange(previous.word, view.word),
+      read: !sameRange(previous.read, view.read),
+    });
   }
 
   /** Scrolls the first editor showing the document so `range` is in view, if it is not already. */
@@ -78,13 +88,20 @@ export class EditorHighlighter implements vscode.Disposable {
     this.readType.dispose();
   }
 
-  private apply(): void {
+  /** Draws the marks in every editor of the document; `parts` limits it to what changed. */
+  private apply(parts: { sentence: boolean; word: boolean; read: boolean } = ALL_PARTS): void {
     const document = this.document;
     const editors = document ? this.editors() : [];
     for (const editor of editors) {
-      editor.setDecorations(this.sentenceType, this.ranges(this.view.sentence));
-      editor.setDecorations(this.wordType, this.ranges(this.view.word));
-      editor.setDecorations(this.readType, this.ranges(this.view.read));
+      if (parts.sentence) {
+        editor.setDecorations(this.sentenceType, this.ranges(this.view.sentence));
+      }
+      if (parts.word) {
+        editor.setDecorations(this.wordType, this.ranges(this.view.word));
+      }
+      if (parts.read) {
+        editor.setDecorations(this.readType, this.ranges(this.view.read));
+      }
     }
   }
 

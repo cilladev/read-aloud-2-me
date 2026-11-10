@@ -26,8 +26,9 @@ export type HostRequest =
   | { readonly type: "pause" }
   | { readonly type: "resume" }
   | { readonly type: "cancel"; readonly run: number }
+  | { readonly type: "load"; readonly id: number; readonly path: string }
   | { readonly type: "play"; readonly id: number; readonly path: string }
-  | { readonly type: "stopAudio" }
+  | { readonly type: "stopAudio"; readonly id: number | null }
   | { readonly type: "quit" };
 
 /** Error codes the host can report. */
@@ -46,6 +47,8 @@ export type HostEvent =
       readonly length: number;
     }
   | { readonly type: "sentenceEnd"; readonly run: number; readonly index: number }
+  | { readonly type: "audioStarted"; readonly id: number; readonly positionMs: number }
+  | { readonly type: "audioEnded"; readonly id: number }
   | {
       readonly type: "error";
       readonly code: HostErrorCode;
@@ -94,6 +97,12 @@ function toEvent(value: Readonly<Record<string, unknown>>): HostEvent | undefine
       return toWord(value);
     case "error":
       return toError(value);
+    case "audioStarted":
+      return isCount(value["id"]) && isCount(value["positionMs"])
+        ? { type: "audioStarted", id: value["id"], positionMs: value["positionMs"] }
+        : undefined;
+    case "audioEnded":
+      return isCount(value["id"]) ? { type: "audioEnded", id: value["id"] } : undefined;
     default:
       return undefined;
   }

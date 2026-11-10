@@ -5,7 +5,7 @@
  * the same audio, cut at an MP3 frame. Must not import vscode.
  */
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SpeechError } from "../engine";
@@ -34,7 +34,8 @@ class OnlineRun implements SpeechRun {
   private index = 0;
   /** Where in the current sentence's audio playback started, in ms. */
   private playedFromMs = 0;
-  private playStartedAt = 0;
+  /** When the current file was first heard (`Date.now()` clock); undefined until it is. */
+  private heardAt: number | undefined;
   private playback: AudioPlayback | undefined;
   private timers: NodeJS.Timeout[] = [];
   private generation = 0;
@@ -58,7 +59,7 @@ class OnlineRun implements SpeechRun {
       return;
     }
     this.state = "paused";
-    const elapsed = this.playback ? Date.now() - this.playStartedAt - this.player.startLatencyMs : 0;
+    const elapsed = this.playback && this.heardAt !== undefined ? Date.now() - this.heardAt : 0;
     this.playedFromMs = Math.max(0, this.playedFromMs + elapsed);
     this.stopAudio();
   }
@@ -104,14 +105,21 @@ class OnlineRun implements SpeechRun {
   }
 
   private start(index: number, synthesis: Synthesis, audio: Uint8Array, startMs: number, remainingMs: number): void {
-    const file = this.writeAudio(index, audio);
+    const file = this.writeAudio(index, audio, startMs);
     this.playedFromMs = startMs;
-    this.playStartedAt = Date.now();
+    this.heardAt = undefined;
     const playback = this.player.play(file, remainingMs);
     this.playback = playback;
-    this.announceThrough(index);
-    this.scheduleWords(index, timeWords(this.sentences[index] ?? "", synthesis.words), startMs);
-    this.scheduleAdvance(index, playback, synthesis, startMs);
+    this.prepareNext(index);
+    void playback.started.then((heardAt) => {
+      if (this.playback !== playback) {
+        return;
+      }
+      this.heardAt = heardAt;
+      this.announceThrough(index);
+      this.scheduleWords(index, timeWords(this.sentences[index] ?? "", synthesis.words), startMs, heardAt);
+      this.scheduleAdvance(index, playback, synthesis, startMs, heardAt);
+    });
     void playback.ended.then((end) => {
       if (this.playback !== playback) {
         return;
@@ -127,8 +135,9 @@ class OnlineRun implements SpeechRun {
     });
   }
 
-  private scheduleWords(index: number, words: readonly TimedWord[], startMs: number): void {
-    const latency = this.player.startLatencyMs;
+  /** Sets a timer per word, measured from when the file was heard, so voice and highlight match. */
+  private scheduleWords(index: number, words: readonly TimedWord[], startMs: number, heardAt: number): void {
+    const late = Date.now() - heardAt;
     for (const word of words) {
       if (word.atMs < startMs) {
         continue;
@@ -137,14 +146,20 @@ class OnlineRun implements SpeechRun {
         () => {
           this.listener.onWord?.({ sentence: index, start: word.start, length: word.length });
         },
-        word.atMs - startMs + latency,
+        Math.max(0, word.atMs - startMs - late),
       );
       this.timers.push(timer);
     }
   }
 
   /** Moves on once the last word is spoken, cutting the silence the service adds at the end. */
-  private scheduleAdvance(index: number, playback: AudioPlayback, synthesis: Synthesis, startMs: number): void {
+  private scheduleAdvance(
+    index: number,
+    playback: AudioPlayback,
+    synthesis: Synthesis,
+    startMs: number,
+    heardAt: number,
+  ): void {
     const end = speechEndMs(synthesis.words);
     if (end === undefined || end + SENTENCE_GAP_MS >= synthesis.durationMs) {
       return;
@@ -159,9 +174,29 @@ class OnlineRun implements SpeechRun {
           void this.playSentence(index + 1, 0);
         }
       },
-      Math.max(0, end + SENTENCE_GAP_MS - startMs) + this.player.startLatencyMs,
+      Math.max(0, end + SENTENCE_GAP_MS - startMs - (Date.now() - heardAt)),
     );
     this.timers.push(timer);
+  }
+
+  /** Once the next sentence has downloaded, writes it and has the player open it ahead. */
+  private prepareNext(index: number): void {
+    const next = index + 1;
+    const prepare = this.player.prepare?.bind(this.player);
+    if (prepare === undefined || next >= this.sentences.length) {
+      return;
+    }
+    const generation = this.generation;
+    this.download(next).then(
+      (synthesis) => {
+        if (generation === this.generation && this.state === "playing") {
+          prepare(this.writeAudio(next, synthesis.audio, 0));
+        }
+      },
+      () => {
+        // Reported when that sentence is played.
+      },
+    );
   }
 
   private prefetch(index: number): void {
@@ -182,10 +217,17 @@ class OnlineRun implements SpeechRun {
     return download;
   }
 
-  private writeAudio(index: number, audio: Uint8Array): string {
+  /**
+   * Writes a sentence's audio to a file. A whole sentence always gets the same name, so a file
+   * prepared ahead is the one played; a resumed part gets a new name.
+   */
+  private writeAudio(index: number, audio: Uint8Array, startMs: number): string {
     mkdirSync(this.dir, { recursive: true });
-    const file = join(this.dir, `${String(index)}-${String(this.generation)}.mp3`);
-    writeFileSync(file, audio);
+    const name = startMs === 0 ? `${String(index)}.mp3` : `${String(index)}-from-${String(startMs)}.mp3`;
+    const file = join(this.dir, name);
+    if (startMs !== 0 || !existsSync(file)) {
+      writeFileSync(file, audio);
+    }
     return file;
   }
 

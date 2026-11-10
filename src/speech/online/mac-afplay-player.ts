@@ -5,49 +5,63 @@
 import { SpeechError } from "../engine";
 import { spawnProcess } from "../process";
 import type { Spawner } from "../process";
-import { settleOnce } from "./audio-player";
+import { playbackSignals } from "./audio-player";
 import type { AudioPlayback, AudioPlayer } from "./audio-player";
 
 const AFPLAY = "afplay";
 
+/**
+ * How long `afplay` takes from launch to sound. It can't report when sound starts, so this is
+ * measured: the audio device came on about 0.35 s after launch.
+ */
+export const AFPLAY_START_MS = 300;
+
 /** macOS player over `afplay`. */
 export class MacAfplayPlayer implements AudioPlayer {
-  /** `afplay` takes about a third of a second to open the audio device (measured). */
-  readonly startLatencyMs = 300;
-
   /** @param spawner - starts processes; tests pass a fake */
   constructor(private readonly spawner: Spawner = spawnProcess) {}
 
   /** Starts `afplay file`; `ended` settles when the process exits. */
   play(file: string): AudioPlayback {
-    const { ended, settle } = settleOnce();
+    const signals = playbackSignals();
+    const launchedAt = Date.now();
+    const startTimer = setTimeout(() => {
+      signals.markStarted(launchedAt + AFPLAY_START_MS);
+    }, AFPLAY_START_MS);
+    void signals.ended.then(() => {
+      clearTimeout(startTimer);
+    });
     let stopped = false;
     try {
       const child = this.spawner(AFPLAY, [file], {});
       child.stdin.end();
       child.on("error", (error) => {
         const missing = "code" in error && error.code === "ENOENT";
-        settle({ kind: "failed", error: new SpeechError(missing ? "toolMissing" : "processFailed", error.message) });
+        signals.settle({
+          kind: "failed",
+          error: new SpeechError(missing ? "toolMissing" : "processFailed", error.message),
+        });
       });
       child.on("exit", (code, signal) => {
         if (stopped || code === 0) {
-          settle(stopped ? { kind: "stopped" } : { kind: "finished" });
+          signals.settle(stopped ? { kind: "stopped" } : { kind: "finished" });
           return;
         }
         const how = code === null ? `stopped by ${String(signal)}` : `exited with ${String(code)}`;
-        settle({ kind: "failed", error: new SpeechError("processFailed", `afplay ${how}`) });
+        signals.settle({ kind: "failed", error: new SpeechError("processFailed", `afplay ${how}`) });
       });
       return {
-        ended,
+        started: signals.started,
+        ended: signals.ended,
         stop: () => {
           stopped = true;
           child.kill("SIGTERM");
-          settle({ kind: "stopped" });
+          signals.settle({ kind: "stopped" });
         },
       };
     } catch (error: unknown) {
-      settle({ kind: "failed", error: new SpeechError("processFailed", `afplay: ${String(error)}`) });
-      return { ended, stop: () => undefined };
+      signals.settle({ kind: "failed", error: new SpeechError("processFailed", `afplay: ${String(error)}`) });
+      return { started: signals.started, ended: signals.ended, stop: () => undefined };
     }
   }
 

@@ -101,6 +101,8 @@ export class WindowsRun implements SpeechRun {
       case "ready":
       case "voices":
       case "error":
+      case "audioStarted":
+      case "audioEnded":
         return;
     }
   }

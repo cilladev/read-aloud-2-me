@@ -41,9 +41,9 @@ Every engine speaks a list of sentences in order and reports `onSentenceStart(in
 **Online voices** (`speech/online/`, the default):
 
 - `edge-synthesizer.ts` downloads each sentence as MP3 with word timings from Microsoft Edge's neural voices, through `msedge-tts`. This is the only code that uses the network.
-- `online-engine.ts` fetches up to three sentences ahead, plays each file, and fires word events from timers. It moves on as soon as the last word ends, skipping the service's trailing silence.
+- `online-engine.ts` fetches up to three sentences ahead and has the player open the next file early. Word timers start when the player reports sound has begun (`AudioPlayback.started`), not when play was asked, so the highlight matches the voice. It moves on as soon as the last word ends, skipping the service's trailing silence.
 - Pause stops playback and remembers the position. Resume plays the rest of the same MP3, cut at a frame boundary (`mp3.ts`), with no new download.
-- Players: `mac-afplay-player.ts` runs `afplay`. `windows-media-player.ts` asks the PowerShell host to play the file with Windows' media player.
+- Players: `mac-afplay-player.ts` runs `afplay` (sound starts about 0.3 s after launch, measured). `windows-media-player.ts` drives Windows' media player in the PowerShell host, which reports `audioStarted` when the position first moves and `audioEnded` at the end.
 - If the service can't be reached before anything plays, `switching-engine.ts` replays the run on the computer's voices and the user is told once.
 
 **Computer voices** (offline):

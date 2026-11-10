@@ -37,6 +37,8 @@ export class EdgeSynthesizer implements Synthesizer {
   private client: MsEdgeTTS | undefined;
   private clientVoice: string | undefined;
   private ready: Promise<void> | undefined;
+  /** The voice list rarely changes, so it is fetched once per session. */
+  private voices: Promise<readonly Voice[]> | undefined;
 
   /** Downloads one sentence with word timings. */
   async synthesize(text: string, voice: string, speed: number): Promise<Synthesis> {
@@ -58,8 +60,16 @@ export class EdgeSynthesizer implements Synthesizer {
     }
   }
 
-  /** Lists the online voices from the service. */
-  async listVoices(): Promise<readonly Voice[]> {
+  /** Lists the online voices from the service, once; a failed fetch is retried next time. */
+  listVoices(): Promise<readonly Voice[]> {
+    this.voices ??= this.fetchVoices();
+    this.voices.catch(() => {
+      this.voices = undefined;
+    });
+    return this.voices;
+  }
+
+  private async fetchVoices(): Promise<readonly Voice[]> {
     try {
       const voices = await new MsEdgeTTS().getVoices();
       return voices.map((voice) => ({

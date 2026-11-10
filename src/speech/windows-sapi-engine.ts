@@ -194,6 +194,10 @@ export class WindowsSapiEngine implements SpeechEngine {
           this.current.handle(event);
         }
         return;
+      case "audioStarted":
+      case "audioEnded":
+        // Audio playback belongs to the online voices' player, which has its own host.
+        return;
     }
   }
 

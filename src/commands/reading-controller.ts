@@ -39,6 +39,8 @@ export class ReadingController implements vscode.Disposable {
   private startIndex = 0;
   private readonly voices: VoiceGuard;
   private warnedFallback = false;
+  /** Settings, re-read only when they change; word events fire many times a second. */
+  private settings = readSettings();
 
   /**
    * @param engine - online and computer voices, switched by the user's choice
@@ -77,6 +79,7 @@ export class ReadingController implements vscode.Disposable {
         this.jumpTo(index);
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
+        this.settings = readSettings();
         if (affectsVoiceOrSpeed(event)) {
           this.voices.reset();
           this.session.restartCurrent();
@@ -282,7 +285,7 @@ export class ReadingController implements vscode.Disposable {
     this.refreshStatus();
     this.reader.setProgress(index);
     const sentence = this.tracked[index];
-    if (!sentence || readSettings().highlight === "off") {
+    if (!sentence || this.settings.highlight === "off") {
       this.highlighter.clear();
       return;
     }
@@ -297,7 +300,7 @@ export class ReadingController implements vscode.Disposable {
   private onWord(word: SessionWord): void {
     this.reader.setProgress(word.sentence, { start: word.start, length: word.length });
     const sentence = this.tracked[word.sentence];
-    if (!sentence || readSettings().highlight !== "wordAndSentence") {
+    if (!sentence || this.settings.highlight !== "wordAndSentence") {
       return;
     }
     this.highlighter.show({

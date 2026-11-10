@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { SpeechError } from "../../../../speech/engine";
 import type { RunEnd, Voice, WordEvent } from "../../../../speech/engine";
 import type { AudioPlayback, AudioPlayer, PlaybackEnd } from "../../../../speech/online/audio-player";
-import { settleOnce } from "../../../../speech/online/audio-player";
+import { playbackSignals } from "../../../../speech/online/audio-player";
 import type { Synthesis, Synthesizer } from "../../../../speech/online/edge-synthesizer";
 import { isNetworkFailure, OnlineEngine } from "../../../../speech/online/online-engine";
 import { mp3DurationMs } from "../../../../speech/online/mp3";
@@ -42,9 +42,9 @@ class FakeSynth implements Synthesizer {
   }
 }
 
-/** Plays nothing; finishes each file after its duration unless the test holds it. */
+/** Plays nothing; is heard at once, finishes after its duration unless the test holds it. */
 class FakePlayer implements AudioPlayer {
-  readonly startLatencyMs = 0;
+  readonly prepared: string[] = [];
   readonly played: { file: string; bytes: number; durationMs: number }[] = [];
   readonly stops: number[] = [];
   hold = false;
@@ -53,24 +53,31 @@ class FakePlayer implements AudioPlayer {
 
   play(file: string, durationMs: number): AudioPlayback {
     this.played.push({ file, bytes: readFileSync(file).length, durationMs });
-    const { ended, settle } = settleOnce();
+    const signals = playbackSignals();
     const failure = this.failNext;
     this.failNext = undefined;
     if (failure) {
-      settle({ kind: "failed", error: failure });
-    } else if (!this.hold) {
-      setTimeout(() => {
-        settle({ kind: "finished" });
-      }, durationMs);
+      signals.settle({ kind: "failed", error: failure });
+    } else {
+      signals.markStarted(Date.now());
+      if (!this.hold) {
+        setTimeout(() => {
+          signals.settle({ kind: "finished" });
+        }, durationMs);
+      }
     }
     const index = this.played.length - 1;
     return {
-      ended,
+      started: signals.started,
+      ended: signals.ended,
       stop: () => {
         this.stops.push(index);
-        settle({ kind: "stopped" } satisfies PlaybackEnd);
+        signals.settle({ kind: "stopped" } satisfies PlaybackEnd);
       },
     };
+  }
+  prepare(file: string): void {
+    this.prepared.push(file);
   }
   dispose(): void {
     this.disposed = true;
@@ -197,5 +204,53 @@ describe("OnlineEngine", () => {
     assert.ok(Date.now() - began < 480, "trailing silence was not cut");
     assert.deepEqual(starts, [0, 1]);
     assert.deepEqual(player.stops, [0, 1]);
+  });
+
+  it("opens the next sentence ahead, and plays that same file", async () => {
+    const { engine, player } = setup();
+    player.hold = true;
+    const run = engine.speak(["One two.", "Three four."], { voice: undefined, speed: 1 }, {});
+    await wait(20);
+    assert.equal(player.prepared.length, 1);
+    assert.ok(player.prepared[0]?.endsWith("1.mp3"));
+    run.cancel();
+    await run.ended;
+  });
+
+  it("times words from when the audio is heard, not when play is asked", async () => {
+    const synth = new FakeSynth();
+    const words: number[] = [];
+    let heard: (at: number) => void = () => undefined;
+    const slow: AudioPlayer = {
+      play: () => {
+        const signals = playbackSignals();
+        heard = (at) => {
+          signals.markStarted(at);
+        };
+        return {
+          started: signals.started,
+          ended: signals.ended,
+          stop: () => {
+            signals.settle({ kind: "stopped" });
+          },
+        };
+      },
+      dispose: () => undefined,
+    };
+    const engine = new OnlineEngine(synth, slow);
+    const began = Date.now();
+    const run = engine.speak(
+      ["One two."],
+      { voice: undefined, speed: 1 },
+      { onWord: () => words.push(Date.now() - began) },
+    );
+    await wait(100);
+    assert.deepEqual(words, [], "no words before the audio is heard");
+    heard(Date.now());
+    await wait(60);
+    assert.equal(words.length, 2);
+    assert.ok(words.every((at) => at >= 100));
+    run.cancel();
+    await run.ended;
   });
 });
