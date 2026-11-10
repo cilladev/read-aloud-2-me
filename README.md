@@ -2,104 +2,98 @@
 
 Select text in VS Code, press a shortcut, and hear it read in a natural voice.
 
-By default it uses Microsoft Edge's online neural voices, the same ones behind Edge's "Read aloud". You can switch to the voices installed on your computer, which work offline.
+## Quick start
 
-## Features
+1. Select some text in any file.
+2. Press `Cmd+'` on Mac or `Ctrl+'` on Windows. You can also right-click and choose **Read Aloud**.
+3. Press the shortcut again, or `Esc`, to stop.
 
-- **One shortcut.** Press `Cmd+'` on Mac or `Ctrl+'` on Windows to read. Press it again, or `Esc`, to stop.
-- **Right-click** selected text and choose **Read Aloud**.
-- **Markdown reads like prose.** No `#` signs, stars, link addresses or table pipes. Code blocks, images and front matter are skipped silently. Tables are read row by row, each cell with its header.
-- **Any file.** Plain text is read as is. In code files, comment markers are left out.
-- **Nothing selected?** Reading starts at the sentence under the cursor and goes to the end of the file. A setting reads the whole file instead.
-- **One sentence at a time.** Go back, skip ahead, pause and resume from the player buttons in the editor title bar while reading.
-- **Highlighting.** The sentence being read is marked in the editor, with the current word, and text already read is dimmed.
-- **Reader panel.** **Open Reader to the Side** shows the text as clean sentences beside your code. The current sentence is lit, sentences already read are dimmed, and clicking a sentence reads from there. Text size can be made larger or smaller.
-- **Status bar.** While reading, the status bar shows the place ("3 of 12"), the speed and the voice. Click the place to stop, the speed or voice to change them.
-- **Markdown preview.** Select text in the preview and press the shortcut. With nothing selected, the preview's source file is read.
-- **Natural voices.** Microsoft Edge's online neural voices by default, on both Mac and Windows. Or this computer's own voices, offline. If the online voices can't be reached, the computer's voice reads instead.
-- **Remote windows.** In SSH, WSL and container windows the extension still runs on your own machine, where the speakers are.
+With nothing selected, reading starts at the cursor and goes to the end of the file.
+
+## What it does
+
+- **Natural voices.** Microsoft Edge's online neural voices by default, on Mac and Windows. Your computer's own voices are an offline option. If the online voices can't be reached, the computer's voice reads instead.
+- **Markdown reads like prose.** No `#`, stars, link addresses or table pipes. Code blocks, images and front matter are skipped silently. Table rows are read with their headers.
+- **Any file.** Plain text is read as is. In code, comment markers are left out.
+- **Follow along.** The sentence being read is marked in the editor, the current word stands out, and text already read is dimmed.
+- **Player.** While reading, the editor title bar has previous, pause, next, stop and reader buttons. The status bar shows the place ("3 of 12"), speed and voice; click them to stop or change.
+- **Reader panel.** **Open Reader to the Side** shows clean sentences beside your code. Click a sentence to read from there. Text size can be changed.
+- **Markdown preview.** Select text in the preview and press the shortcut.
+- **Remote windows.** In SSH, WSL and container windows it runs on your own machine, where the speakers are.
+
+## Voices
+
+Run **Read Aloud 2 Me: Pick Voice**. It lists two groups:
+
+- **Online voices**, the default. They sound the most natural. Your language comes first; "multilingual" voices such as Ava and Andrew handle many languages.
+- **This computer's voices**, which work offline. On a Mac the best are Siri's: set a Siri voice as **System voice** in **System Settings > Accessibility > Read & Speak**, then choose **System voice** in the list. On Windows, add voices in **Settings > Time & language > Speech**.
+
+## Privacy
+
+- **Online voices:** the sentences being read are sent to Microsoft's speech service, the same way Edge's "Read aloud" works. Nothing else is sent.
+- **This computer's voices:** nothing leaves your computer. Set **Voice Source** to `computer` to stay offline.
+
+There is no telemetry.
 
 ## Commands
 
 <!-- Every command in package.json is listed here. A test checks. -->
 
-| Command                                  | What it does                                                          |
-| ---------------------------------------- | --------------------------------------------------------------------- |
-| Read Aloud 2 Me: Read Aloud or Stop      | Reads the selection, or stops if already reading. `Cmd+'` / `Ctrl+'`  |
-| Read Aloud 2 Me: Read Aloud              | Reads the selection, or from the cursor. Also in the right-click menu |
-| Read Aloud 2 Me: Stop Reading            | Stops. `Esc` while reading                                            |
-| Read Aloud 2 Me: Pause or Resume         | Pauses mid-sentence, or carries on                                    |
-| Read Aloud 2 Me: Pause                   | Pauses mid-sentence                                                   |
-| Read Aloud 2 Me: Resume                  | Carries on after a pause                                              |
-| Read Aloud 2 Me: Previous Sentence       | Goes back one sentence                                                |
-| Read Aloud 2 Me: Next Sentence           | Skips to the next sentence                                            |
-| Read Aloud 2 Me: Pick Voice              | Lists the voices on this computer so you can choose one               |
-| Read Aloud 2 Me: Set Speed               | Chooses a speed from half to twice as fast                            |
-| Read Aloud 2 Me: Open Reader to the Side | Opens the reader panel beside the editor                              |
+| Command                                  | What it does                                                    |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| Read Aloud 2 Me: Read Aloud or Stop      | Reads, or stops if reading. `Cmd+'` / `Ctrl+'`                  |
+| Read Aloud 2 Me: Read Aloud              | Reads the selection or from the cursor. In the right-click menu |
+| Read Aloud 2 Me: Stop Reading            | Stops. `Esc` while reading                                      |
+| Read Aloud 2 Me: Pause or Resume         | Pauses mid-sentence, or carries on                              |
+| Read Aloud 2 Me: Pause                   | Pauses mid-sentence                                             |
+| Read Aloud 2 Me: Resume                  | Carries on after a pause                                        |
+| Read Aloud 2 Me: Previous Sentence       | Goes back one sentence                                          |
+| Read Aloud 2 Me: Next Sentence           | Skips to the next sentence                                      |
+| Read Aloud 2 Me: Pick Voice              | Chooses an online or computer voice                             |
+| Read Aloud 2 Me: Set Speed               | Chooses a speed from half to twice as fast                      |
+| Read Aloud 2 Me: Open Reader to the Side | Opens the reader panel beside the editor                        |
 
-Change any shortcut in **Keyboard Shortcuts** (`Cmd+K Cmd+S`). Search for "Read Aloud 2 Me".
+To change a shortcut, open **Keyboard Shortcuts** and search for "Read Aloud 2 Me".
 
 ## Settings
 
 <!-- Every setting in package.json is listed here. A test checks. -->
 
-| Setting                                | Default                       | What it does                                                                                         |
-| -------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `readAloud2Me.voiceSource`             | `online`                      | `online` for Edge's natural voices (needs internet), `computer` for this computer's voices (offline) |
-| `readAloud2Me.onlineVoice`             | `en-US-AvaMultilingualNeural` | The online voice                                                                                     |
-| `readAloud2Me.voice`                   | empty                         | The computer voice, used when the source is `computer`. Empty means your computer's default voice    |
-| `readAloud2Me.speed`                   | `1`                           | Reading speed, from `0.5` to `2`                                                                     |
-| `readAloud2Me.markdown.skipCodeBlocks` | `true`                        | Leave out code blocks in Markdown                                                                    |
-| `readAloud2Me.withoutSelection`        | `cursorToEnd`                 | With nothing selected: read from the cursor (`cursorToEnd`) or the whole file (`wholeFile`)          |
-| `readAloud2Me.reader.openOnStart`      | `false`                       | Open the reader panel each time reading starts                                                       |
-| `readAloud2Me.player.show`             | `true`                        | Show the player buttons in the editor title bar while reading                                        |
-| `readAloud2Me.highlight`               | `wordAndSentence`             | Mark the word and sentence (`wordAndSentence`), the sentence only (`sentence`), or nothing (`off`)   |
-
-The voice setting stays on this computer and is not synced, because Mac and Windows voices have different names.
-
-## Voices
-
-Run **Read Aloud 2 Me: Pick Voice**. The list has two groups:
-
-- **Online voices** are Microsoft Edge's neural voices. They sound the most natural and work on Mac and Windows alike. Voices in your language come first; "multilingual" voices such as Ava and Andrew read many languages well.
-- **This computer's voices** work offline. On a Mac the most natural ones are Siri's: set a Siri voice as the **System voice** in **System Settings > Accessibility > Read & Speak**, then choose **System voice** here. On Windows, add voices in **Settings > Time & language > Speech**.
-
-## Privacy
-
-- **Online voices (the default):** the sentences being read are sent to Microsoft's speech service to be turned into audio, the same way Edge's "Read aloud" works. Nothing else is sent: no file names, no other text, no account.
-- **This computer's voices:** nothing leaves your computer.
-
-The extension collects no telemetry. Set `readAloud2Me.voiceSource` to `computer` to keep everything offline.
+| Setting                                | Default                       | What it does                                                        |
+| -------------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
+| `readAloud2Me.voiceSource`             | `online`                      | `online` (natural, needs internet) or `computer` (offline)          |
+| `readAloud2Me.onlineVoice`             | `en-US-AvaMultilingualNeural` | The online voice                                                    |
+| `readAloud2Me.voice`                   | empty                         | The computer voice. Empty means your system voice. Not synced       |
+| `readAloud2Me.speed`                   | `1`                           | From `0.5` to `2`                                                   |
+| `readAloud2Me.markdown.skipCodeBlocks` | `true`                        | Leave out code blocks in Markdown                                   |
+| `readAloud2Me.withoutSelection`        | `cursorToEnd`                 | With nothing selected: from the cursor, or `wholeFile`              |
+| `readAloud2Me.reader.openOnStart`      | `false`                       | Open the reader panel each time reading starts                      |
+| `readAloud2Me.player.show`             | `true`                        | Show the player buttons in the editor title bar                     |
+| `readAloud2Me.highlight`               | `wordAndSentence`             | Mark the word and sentence, the `sentence` only, or nothing (`off`) |
 
 ## Troubleshooting
 
-- **Online voices don't play.** Check your internet connection, or a firewall blocking `speech.platform.bing.com`. The computer's voice reads instead until they're back.
-- **Nothing happens on `Cmd+'`.** Another extension may use the same key, or your keyboard layout may put `'` elsewhere. Open **Keyboard Shortcuts** and bind **Read Aloud 2 Me: Read Aloud or Stop** to a key you like.
-- **There is a short wait before speech starts.** Online voices take a second or two to download the first sentence; the rest are fetched ahead. The macOS speech tool also takes about a second to start.
-- **Windows: "security policy blocks PowerShell".** Your organisation limits PowerShell, so the extension can't reach the voices. Ask your IT team.
-- **Details.** Open the **Output** panel and choose **Read Aloud 2 Me**. The log never contains your text.
+- **The shortcut does nothing.** Another extension may use it. Open **Keyboard Shortcuts**, find **Read Aloud 2 Me: Read Aloud or Stop**, and record a key you like. Right-click **Read Aloud** always works.
+- **Online voices don't play.** Check your connection, or a firewall blocking `speech.platform.bing.com`. The computer's voice reads meanwhile.
+- **A short wait before speech starts.** The first online sentence takes a second or two to download; later ones are fetched ahead.
+- **Windows: "security policy blocks PowerShell".** Your organisation limits PowerShell, which the extension needs to play sound. Ask your IT team.
+- **More detail.** Open the **Output** panel and choose **Read Aloud 2 Me**. The log never contains your text.
 
-## Supported editors
+## Requirements
 
-VS Code 1.90 or later, on macOS and Windows. It also works in editors built on VS Code, such as Cursor, Windsurf and VSCodium. Linux is not supported yet. It does not run in the browser (vscode.dev or Codespaces in a browser tab).
+VS Code 1.90 or later on macOS or Windows. Also works in Cursor, Windsurf and VSCodium. Linux and browser-based VS Code are not supported yet.
 
 ## Install from source
 
-You need [Node.js](https://nodejs.org) 22 or later and the editor's command line (`code`).
-
-macOS or Linux:
+You need [Node.js](https://nodejs.org) 22 or later.
 
 ```sh
-./install.sh
+npm ci
+npm run vsix
+code --install-extension read-aloud-2-me.vsix
 ```
 
-Windows (PowerShell):
-
-```powershell
-.\install.ps1
-```
-
-For a fork, name its command: `./install.sh cursor`. Then reload the editor window.
+Or run `./install.sh` (macOS) or `.\install.ps1` (Windows), which do the same. For a fork, pass its command, for example `./install.sh cursor`. Then reload the editor window.
 
 ## Contributing
 
