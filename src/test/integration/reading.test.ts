@@ -75,4 +75,27 @@ describe("reading aloud (real speech)", function () {
     await vscode.commands.executeCommand("readAloud2Me.toggle");
     assert.equal(api.state, "idle");
   });
+
+  it("survives rapid next, previous and a voice change mid-sentence", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "Alpha one here. Bravo two here. Charlie three here. Delta four here. Echo five here.",
+      language: "plaintext",
+    });
+    await vscode.window.showTextDocument(document);
+    await vscode.commands.executeCommand("readAloud2Me.read");
+    for (const command of ["next", "next", "previous", "next", "previous"]) {
+      await vscode.commands.executeCommand(`readAloud2Me.${command}`);
+    }
+    assert.equal(api.state, "reading");
+    assert.equal(api.current, 1);
+    const config = vscode.workspace.getConfiguration("readAloud2Me");
+    await config.update("onlineVoice", "en-US-AndrewMultilingualNeural", vscode.ConfigurationTarget.Global);
+    await config.update("speed", 1.5, vscode.ConfigurationTarget.Global);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(api.state, "reading");
+    await waitFor(() => api.current >= 2, "reading to carry on after the voice change");
+    await vscode.commands.executeCommand("readAloud2Me.stop");
+    await config.update("onlineVoice", undefined, vscode.ConfigurationTarget.Global);
+    assert.equal(api.state, "idle");
+  });
 });

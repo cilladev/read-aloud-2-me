@@ -66,7 +66,7 @@ export function activate(context: vscode.ExtensionContext): ReadAloud2MeApi {
     },
     reader,
     controller,
-    ...registerCommands(controller),
+    ...registerCommands(controller, log),
   );
   return api;
 }

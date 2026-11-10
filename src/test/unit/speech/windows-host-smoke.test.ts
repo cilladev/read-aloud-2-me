@@ -2,6 +2,7 @@ import * as assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { removeFolder } from "../../../speech/online/online-engine";
 import { WindowsMediaPlayer } from "../../../speech/online/windows-media-player";
 import { WindowsSapiEngine } from "../../../speech/windows-sapi-engine";
 import { fakeMp3 } from "./online/mp3-frames";
@@ -55,6 +56,25 @@ describe("Windows speech host (real PowerShell)", function () {
         ),
       );
       assert.deepEqual(scriptErrors, []);
+    } finally {
+      player.dispose();
+    }
+  });
+
+  it("closes every file on stopAll, so a run's folder can be deleted", async () => {
+    const player = new WindowsMediaPlayer(SCRIPT);
+    const dir = mkdtempSync(join(tmpdir(), "ra2m-"));
+    const first = join(dir, "0.mp3");
+    const second = join(dir, "1.mp3");
+    writeFileSync(first, fakeMp3(200));
+    writeFileSync(second, fakeMp3(200));
+    try {
+      player.play(first, 4800);
+      player.prepare(second);
+      // Let the host start and open both files, as during reading.
+      await new Promise((resolve) => setTimeout(resolve, 12000));
+      player.stopAll();
+      await removeFolder(dir);
     } finally {
       player.dispose();
     }

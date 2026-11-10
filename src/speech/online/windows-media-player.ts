@@ -73,6 +73,15 @@ export class WindowsMediaPlayer implements AudioPlayer {
     };
   }
 
+  /** Stops playback and closes every file the host has open, so a run's folder can be deleted. */
+  stopAll(): void {
+    for (const signals of this.active.values()) {
+      signals.settle({ kind: "stopped" });
+    }
+    this.prepared.clear();
+    this.host?.send({ type: "stopAudio", id: null });
+  }
+
   /** Stops playback, forgets prepared files and ends the host process. */
   dispose(): void {
     for (const signals of this.active.values()) {

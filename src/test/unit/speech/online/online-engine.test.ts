@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { SpeechError } from "../../../../speech/engine";
 import type { RunEnd, Voice, WordEvent } from "../../../../speech/engine";
@@ -45,6 +45,7 @@ class FakeSynth implements Synthesizer {
 /** Plays nothing; is heard at once, finishes after its duration unless the test holds it. */
 class FakePlayer implements AudioPlayer {
   readonly prepared: string[] = [];
+  stopAlls = 0;
   readonly played: { file: string; bytes: number; durationMs: number }[] = [];
   readonly stops: number[] = [];
   hold = false;
@@ -78,6 +79,9 @@ class FakePlayer implements AudioPlayer {
   }
   prepare(file: string): void {
     this.prepared.push(file);
+  }
+  stopAll(): void {
+    this.stopAlls++;
   }
   dispose(): void {
     this.disposed = true;
@@ -180,6 +184,8 @@ describe("OnlineEngine", () => {
     assert.ok(existsSync(file));
     const second = engine.speak(["Two."], { voice: undefined, speed: 1 }, {});
     assert.deepEqual(await first.ended, { kind: "cancelled" });
+    assert.equal(player.stopAlls, 1, "files closed before the folder is deleted");
+    await wait(50);
     assert.equal(existsSync(dirname(file)), false);
     engine.dispose();
     assert.deepEqual(await second.ended, { kind: "cancelled" });
@@ -252,5 +258,39 @@ describe("OnlineEngine", () => {
     assert.ok(words.every((at) => at >= 100));
     run.cancel();
     await run.ended;
+  });
+
+  it("keeps going when the old run's folder can't be deleted, as on Windows with an open file", async () => {
+    const synth = new FakeSynth();
+    const player = new FakePlayer();
+    player.hold = true;
+    const logs: string[] = [];
+    const engine = new OnlineEngine(synth, player, {
+      log: (message) => logs.push(message),
+      removeFolder: () => Promise.reject(new Error("ENOTEMPTY: directory not empty")),
+    });
+    const first = engine.speak(["One two."], { voice: undefined, speed: 1 }, {});
+    await wait(10);
+    const second = engine.speak(["Three four."], { voice: undefined, speed: 1 }, {});
+    assert.deepEqual(await first.ended, { kind: "cancelled" });
+    await wait(10);
+    assert.equal(player.played.length, 2, "the new run plays");
+    assert.ok(logs.some((line) => line.includes("ENOTEMPTY")));
+    engine.dispose();
+    await second.ended;
+  });
+
+  it("fails cleanly when the audio file can't be written", async () => {
+    const { engine } = setup();
+    const run = engine.speak(["One two."], { voice: undefined, speed: 1 }, {});
+    // Make the run's folder path a file, so writing inside it fails.
+    const dir = (run as unknown as { dir: string }).dir;
+    writeFileSync(dir, "not a folder");
+    try {
+      const end = await run.ended;
+      assert.equal(end.kind, "failed");
+    } finally {
+      rmSync(dir, { force: true });
+    }
   });
 });

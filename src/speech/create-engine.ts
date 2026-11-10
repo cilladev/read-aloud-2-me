@@ -62,12 +62,15 @@ export function createOnlineEngine(
   spawner: Spawner,
 ): SpeechEngine {
   if (platform === "darwin") {
-    return new OnlineEngine(new EdgeSynthesizer(), new MacAfplayPlayer(spawner));
+    return new OnlineEngine(new EdgeSynthesizer(), new MacAfplayPlayer(spawner), { log });
   }
   if (platform === "win32") {
     const player = new WindowsMediaPlayer(join(resourcesDir, WINDOWS_HOST_SCRIPT), spawner, log);
-    return new OnlineEngine(new EdgeSynthesizer(), player, () => {
-      player.warmUp();
+    return new OnlineEngine(new EdgeSynthesizer(), player, {
+      log,
+      beforeSpeak: () => {
+        player.warmUp();
+      },
     });
   }
   return new UnsupportedEngine(platform);

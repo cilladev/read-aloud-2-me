@@ -37,6 +37,11 @@ export interface AudioPlayer {
   play(file: string, durationMs: number): AudioPlayback;
   /** Opens `file` ahead of time so a later `play(file)` starts at once. Optional. */
   prepare?(file: string): void;
+  /**
+   * Stops everything and closes every file, including ones opened ahead, so the files can be
+   * deleted. Optional: players that hold no files open don't need it.
+   */
+  stopAll?(): void;
   /** Stops any playback and frees helper processes. */
   dispose(): void;
 }

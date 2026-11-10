@@ -5,7 +5,8 @@
  * the same audio, cut at an MP3 frame. Must not import vscode.
  */
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SpeechError } from "../engine";
@@ -22,6 +23,26 @@ export const PREFETCH_AHEAD = 3;
 
 /** The pause left after a sentence's last word before the next sentence starts. */
 export const SENTENCE_GAP_MS = 150;
+
+/** Removes a run's folder of audio files. Must never throw; failures are for the log only. */
+export type FolderRemover = (dir: string) => Promise<void>;
+
+/**
+ * Deletes a folder in the background. On Windows the media player may still hold a file for a
+ * moment after it was told to close it, so deletion retries before giving up.
+ */
+export const removeFolder: FolderRemover = (dir) =>
+  rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+
+/** Optional collaborators of {@link OnlineEngine}. */
+export interface OnlineEngineOptions {
+  /** Called at the start of each run, for example to start a helper process early. */
+  readonly beforeSpeak?: () => void;
+  /** Receives problems that don't stop reading, such as a temp folder that couldn't be removed. */
+  readonly log?: (message: string) => void;
+  /** Deletes a run's audio folder; tests pass a fake. */
+  readonly removeFolder?: FolderRemover;
+}
 
 type RunState = "playing" | "paused" | "done";
 
@@ -48,6 +69,7 @@ class OnlineRun implements SpeechRun {
     private readonly sentences: readonly string[],
     private readonly options: SpeakOptions,
     private readonly listener: RunListener,
+    private readonly cleanup: (dir: string) => void,
   ) {
     this.ended = new Promise((resolve) => (this.settleEnded = resolve));
     this.dir = join(tmpdir(), `read-aloud-2-me-${randomUUID()}`);
@@ -105,7 +127,13 @@ class OnlineRun implements SpeechRun {
   }
 
   private start(index: number, synthesis: Synthesis, audio: Uint8Array, startMs: number, remainingMs: number): void {
-    const file = this.writeAudio(index, audio, startMs);
+    let file: string;
+    try {
+      file = this.writeAudio(index, audio, startMs);
+    } catch (error: unknown) {
+      this.fail(new SpeechError("processFailed", `Could not write audio to ${this.dir}: ${String(error)}`));
+      return;
+    }
     this.playedFromMs = startMs;
     this.heardAt = undefined;
     const playback = this.player.play(file, remainingMs);
@@ -189,8 +217,14 @@ class OnlineRun implements SpeechRun {
     const generation = this.generation;
     this.download(next).then(
       (synthesis) => {
-        if (generation === this.generation && this.state === "playing") {
+        if (generation !== this.generation || this.state !== "playing") {
+          return;
+        }
+        try {
           prepare(this.writeAudio(next, synthesis.audio, 0));
+        } catch {
+          // Opening ahead is only a head start; the sentence is written again when it plays,
+          // and any real write problem is reported then.
         }
       },
       () => {
@@ -264,8 +298,9 @@ class OnlineRun implements SpeechRun {
     }
     this.state = "done";
     this.stopAudio();
-    rmSync(this.dir, { recursive: true, force: true });
+    this.player.stopAll?.();
     this.settleEnded(end);
+    this.cleanup(this.dir);
   }
 }
 
@@ -278,12 +313,12 @@ export class OnlineEngine implements SpeechEngine {
   /**
    * @param synth - downloads speech; tests pass a fake
    * @param player - plays audio on this platform; tests pass a fake
-   * @param beforeSpeak - called at the start of each run, for example to start a helper early
+   * @param options - optional hooks: an early start, a log, and folder removal
    */
   constructor(
     private readonly synth: Synthesizer,
     private readonly player: AudioPlayer,
-    private readonly beforeSpeak: () => void = () => undefined,
+    private readonly options: OnlineEngineOptions = {},
   ) {}
 
   /** Lists the online voices. */
@@ -294,10 +329,20 @@ export class OnlineEngine implements SpeechEngine {
   /** Cancels any current run and starts reading `sentences`. */
   speak(sentences: readonly string[], options: SpeakOptions, listener: RunListener): SpeechRun {
     this.current?.cancel();
-    this.beforeSpeak();
-    const run = new OnlineRun(this.synth, this.player, sentences, options, listener);
+    this.options.beforeSpeak?.();
+    const run = new OnlineRun(this.synth, this.player, sentences, options, listener, (dir) => {
+      this.removeInBackground(dir);
+    });
     this.current = run;
     return run;
+  }
+
+  /** Deletes a finished run's audio without ever blocking or failing the caller. */
+  private removeInBackground(dir: string): void {
+    const remove = this.options.removeFolder ?? removeFolder;
+    remove(dir).catch((error: unknown) => {
+      this.options.log?.(`Could not remove temporary audio folder ${dir}: ${String(error)}`);
+    });
   }
 
   /** Stops playback and closes the connection. */

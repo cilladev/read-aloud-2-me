@@ -4,6 +4,7 @@
  */
 import * as vscode from "vscode";
 import type { ReadingController } from "./reading-controller";
+import { showSpeechError } from "./speech-errors";
 
 /** Command ids, as contributed in package.json. */
 export const COMMANDS = {
@@ -21,13 +22,23 @@ export const COMMANDS = {
 } as const;
 
 /**
- * Registers the commands.
+ * Registers the commands. Every handler is guarded: an unexpected failure is logged and shown
+ * as one plain message, never as a raw system error, and never leaves a command half done.
  *
+ * @param controller - does the work
+ * @param log - the extension's log channel
  * @returns disposables for `context.subscriptions`
  */
-export function registerCommands(controller: ReadingController): vscode.Disposable[] {
+export function registerCommands(controller: ReadingController, log: vscode.LogOutputChannel): vscode.Disposable[] {
   const register = (id: string, handler: () => unknown): vscode.Disposable =>
-    vscode.commands.registerCommand(id, handler);
+    vscode.commands.registerCommand(id, async () => {
+      try {
+        await handler();
+      } catch (error: unknown) {
+        log.error(`${id} failed`);
+        await showSpeechError(error, log);
+      }
+    });
   return [
     register(COMMANDS.toggle, () => controller.toggle()),
     register(COMMANDS.read, () => controller.read()),
