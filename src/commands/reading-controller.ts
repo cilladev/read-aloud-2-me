@@ -9,7 +9,9 @@ import type { ReaderPanel } from "../reader/reader-panel";
 import { shiftSentences } from "../session/offset-shift";
 import { ReadingSession } from "../session/reading-session";
 import type { SessionState, SessionWord } from "../session/reading-session";
-import type { RunEnd, SpeechEngine } from "../speech/engine";
+import type { RunEnd, Voice } from "../speech/engine";
+import { onlineVoiceName } from "../speech/online/edge-synthesizer";
+import type { SwitchingEngine } from "../speech/switching-engine";
 import { mapSpokenRange } from "../text/offset-map";
 import type { Sentence } from "../text/types";
 import { setReadingContext } from "../ui/context-keys";
@@ -17,7 +19,7 @@ import { EditorHighlighter } from "../ui/highlighter";
 import { pickSpeed, pickVoice } from "../ui/quick-picks";
 import { ReadingStatusBar } from "../ui/status-bar";
 import { isMarkdownPreviewActive, requestFromPreview } from "./preview-request";
-import { requestFromEditor, startsParagraph } from "./read-request";
+import { clearSelection, readerSentences, requestFromEditor } from "./read-request";
 import type { ReadRequest } from "./read-request";
 import { showSpeechError } from "./speech-errors";
 import { VoiceGuard } from "./voice-guard";
@@ -36,21 +38,23 @@ export class ReadingController implements vscode.Disposable {
   /** The sentence the current reading started at, for dimming what has been read. */
   private startIndex = 0;
   private readonly voices: VoiceGuard;
+  private warnedFallback = false;
 
   /**
-   * @param engine - the platform speech engine
+   * @param engine - online and computer voices, switched by the user's choice
    * @param reader - the reader panel, shown on demand
    * @param log - the extension's log channel
    */
   constructor(
-    engine: SpeechEngine,
+    private readonly engine: SwitchingEngine,
     private readonly reader: ReaderPanel,
     private readonly log: vscode.LogOutputChannel,
   ) {
-    this.voices = new VoiceGuard(engine, log);
+    this.voices = new VoiceGuard(() => engine.listVoicesFor("computer"), log);
     this.session = new ReadingSession(engine, () => {
       const settings = readSettings();
-      return { voice: this.voices.usable(settings.voice), speed: settings.speed };
+      const voice = settings.voiceSource === "online" ? settings.onlineVoice : this.voices.usable(settings.voice);
+      return { voice, speed: settings.speed };
     });
     this.session.subscribe({
       onState: (state) => {
@@ -119,7 +123,11 @@ export class ReadingController implements vscode.Disposable {
       void vscode.window.showInformationMessage("There is nothing to read here.");
       return;
     }
-    await this.voices.check(readSettings().voice, () => this.pickVoice());
+    const settings = readSettings();
+    if (settings.voiceSource === "computer") {
+      await this.voices.check(settings.voice, () => this.pickVoice());
+    }
+    clearSelection(vscode.window.activeTextEditor, request);
     this.begin(request, request.startIndex);
   }
 
@@ -158,16 +166,35 @@ export class ReadingController implements vscode.Disposable {
     this.reader.show();
   }
 
-  /** Lets the user pick an installed voice and saves it. A running sentence restarts with it. */
+  /** Lets the user pick an online or computer voice and saves it. A running sentence restarts with it. */
   async pickVoice(): Promise<void> {
     try {
-      const voices = await this.voices.installed(true);
-      const chosen = await pickVoice(voices, readSettings().voice);
+      const [online, computer] = await Promise.all([
+        this.listOrEmpty(this.engine.listVoicesFor("online"), "online"),
+        this.listOrEmpty(this.voices.installed(true), "computer"),
+      ]);
+      const settings = readSettings();
+      const current =
+        settings.voiceSource === "online"
+          ? { source: settings.voiceSource, voice: settings.onlineVoice }
+          : { source: settings.voiceSource, voice: settings.voice ?? "" };
+      const chosen = await pickVoice({ online, computer }, current, vscode.env.language);
       if (chosen !== undefined) {
-        await saveVoice(chosen);
+        await saveVoice(chosen.source, chosen.voice);
       }
     } catch (error: unknown) {
       await showSpeechError(error, this.log);
+    }
+  }
+
+  /** Tells the user once that the online voices were out of reach and the computer's voice is reading. */
+  notifyFallback(error: Error): void {
+    this.log.warn(`Online voices unavailable, using this computer's voice: ${error.message}`);
+    if (!this.warnedFallback) {
+      this.warnedFallback = true;
+      void vscode.window.showWarningMessage(
+        "Couldn't reach the online voices, so this computer's voice is reading instead.",
+      );
     }
   }
 
@@ -183,6 +210,15 @@ export class ReadingController implements vscode.Disposable {
     this.session.stop();
     for (const disposable of this.disposables) {
       disposable.dispose();
+    }
+  }
+
+  private async listOrEmpty(list: Promise<readonly Voice[]>, source: string): Promise<readonly Voice[]> {
+    try {
+      return await list;
+    } catch (error: unknown) {
+      this.log.warn(`Could not list ${source} voices: ${String(error)}`);
+      return [];
     }
   }
 
@@ -211,7 +247,7 @@ export class ReadingController implements vscode.Disposable {
     this.startIndex = from;
     this.tracked = [...request.sentences];
     this.highlighter.attach(request.document);
-    this.reader.setDocument(request.title, this.readerSentences(request));
+    this.reader.setDocument(request.title, readerSentences(request));
     if (readSettings().openReaderOnStart) {
       this.reader.show();
     }
@@ -219,17 +255,6 @@ export class ReadingController implements vscode.Disposable {
       request.sentences.map((sentence) => sentence.text),
       from,
     );
-  }
-
-  private readerSentences(request: ReadRequest): { text: string; paragraphStart: boolean }[] {
-    return request.sentences.map((sentence, index) => {
-      const previous = request.sentences[index - 1];
-      return {
-        text: sentence.text,
-        paragraphStart:
-          previous !== undefined && startsParagraph(request.fullText, previous.sourceEnd, sentence.sourceStart),
-      };
-    });
   }
 
   private jumpTo(index: number): void {
@@ -316,7 +341,8 @@ export class ReadingController implements vscode.Disposable {
       current: this.session.current,
       total: this.session.total,
       speed: settings.speed,
-      voice: this.voices.usable(settings.voice),
+      voice:
+        settings.voiceSource === "online" ? onlineVoiceName(settings.onlineVoice) : this.voices.usable(settings.voice),
       sentence: this.request?.sentences[this.session.current]?.text,
     });
   }

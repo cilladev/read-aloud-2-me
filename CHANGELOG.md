@@ -18,3 +18,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The status bar shows the place, speed and voice while reading.
 - Pick Voice lists the voices installed on the computer, best first. Set Speed picks a speed from half to twice as fast.
 - Read from the Markdown preview.
+- Natural online voices from Microsoft Edge, on Mac and Windows, with the computer's own voices as an offline option and automatic fallback.
+- The word being read stands out more, and the selection no longer hides the highlights.
+- `Ctrl+'` also works on Windows keyboard layouts that report the quote key differently.

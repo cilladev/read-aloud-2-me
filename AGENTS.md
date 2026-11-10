@@ -8,8 +8,8 @@ A VS Code extension. The user selects text, presses `Cmd+'` (Mac) or `Ctrl+'` (W
 
 Three promises shape every change:
 
-- **Text stays on the computer.** No network calls, no telemetry, no cloud voices.
-- **Only installed voices.** macOS voices through `say`, Windows voices through PowerShell.
+- **Natural voices by default, offline on request.** Online voices are Microsoft Edge's neural voices, reached only from `src/speech/online/` through `msedge-tts`; only the sentence being read is sent. Computer voices (`say` on macOS, PowerShell on Windows) never touch the network. No telemetry.
+- **Fall back, don't fail.** If the online voices can't be reached before anything plays, the computer's voice reads instead.
 - **It runs where the speakers are.** `extensionKind` is `["ui"]`, so in SSH, WSL and container windows it still runs on the user's own machine.
 
 ## Commands
@@ -108,7 +108,7 @@ Every command has `"category": "Read Aloud 2 Me"`, so the palette shows `Read Al
 - **Context keys:** UI state that keybindings need (`readAloud2Me.isReading`) is set with `setContext` in one place.
 - **Webviews:** a strict Content Security Policy with a nonce, `localResourceRoots` limited to `media/`, no remote scripts, styles or fonts. Messages between the webview and the extension are typed with a shared union.
 - **Processes:** `spawn` or `execFile` with an argument list. Never a shell string; `exec` is a lint error. Text goes to `say` and PowerShell through stdin, never in the arguments. Each process is killed when reading stops and when the extension deactivates.
-- **No network:** `fetch`, `http` and `https` are not used in `src/`.
+- **Network:** only `src/speech/online/` talks to the network, through `msedge-tts`. `fetch` stays banned everywhere.
 - **Engine range:** `engines.vscode` stays at `^1.90.0` so Cursor, Windsurf and VSCodium can install it. `@types/vscode` matches that version, never newer.
 - **Bundle:** esbuild bundles `src/extension.ts` to `dist/extension.js`. Runtime `dependencies` are rare; each one needs a reason in the pull request.
 

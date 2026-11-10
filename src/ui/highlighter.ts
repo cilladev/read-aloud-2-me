@@ -22,8 +22,12 @@ export class EditorHighlighter implements vscode.Disposable {
     backgroundColor: new vscode.ThemeColor("editor.wordHighlightBackground"),
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
   });
+  // The current word uses the theme's "current find match" colours: the strongest highlight
+  // every theme defines, so it stays visible on top of the sentence mark.
   private readonly wordType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: new vscode.ThemeColor("editor.findMatchHighlightBackground"),
+    backgroundColor: new vscode.ThemeColor("editor.findMatchBackground"),
+    border: "1px solid",
+    borderColor: new vscode.ThemeColor("editor.findMatchBorder"),
     borderRadius: "2px",
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
   });

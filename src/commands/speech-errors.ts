@@ -42,6 +42,11 @@ export function describe(error: unknown): { message: string; actions: string[] }
         message: "This computer's security policy blocks PowerShell, so Read Aloud 2 Me can't speak.",
         actions: [SHOW_DETAILS],
       };
+    case "networkFailed":
+      return {
+        message: "Couldn't reach the online voices. Check your internet connection, or use this computer's voices.",
+        actions: [PICK_VOICE, SHOW_DETAILS],
+      };
     case "processFailed":
       return { message: "Reading stopped because the speech tool failed.", actions: [SHOW_DETAILS] };
   }

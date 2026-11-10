@@ -85,7 +85,7 @@ export interface SpeechEngine {
 
 /** Why the engine could not speak. `code` lets the UI pick a helpful message and button. */
 export type SpeechErrorCode =
-  "unsupportedPlatform" | "toolMissing" | "voiceNotFound" | "blockedByPolicy" | "processFailed";
+  "unsupportedPlatform" | "toolMissing" | "voiceNotFound" | "blockedByPolicy" | "networkFailed" | "processFailed";
 
 /** An error from a speech engine, with a code the UI can act on. */
 export class SpeechError extends Error {

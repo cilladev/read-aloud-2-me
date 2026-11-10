@@ -1,8 +1,8 @@
 # Read Aloud 2 Me
 
-Select text in VS Code, press a shortcut, and hear it in your computer's own voice.
+Select text in VS Code, press a shortcut, and hear it read in a natural voice.
 
-Works offline. Your text never leaves your computer.
+By default it uses Microsoft Edge's online neural voices, the same ones behind Edge's "Read aloud". You can switch to the voices installed on your computer, which work offline.
 
 ## Features
 
@@ -16,7 +16,7 @@ Works offline. Your text never leaves your computer.
 - **Reader panel.** **Open Reader to the Side** shows the text as clean sentences beside your code. The current sentence is lit, sentences already read are dimmed, and clicking a sentence reads from there. Text size can be made larger or smaller.
 - **Status bar.** While reading, the status bar shows the place ("3 of 12"), the speed and the voice. Click the place to stop, the speed or voice to change them.
 - **Markdown preview.** Select text in the preview and press the shortcut. With nothing selected, the preview's source file is read.
-- **Your computer's voices only.** macOS voices through `say`, Windows voices through PowerShell. Nothing is downloaded.
+- **Natural voices.** Microsoft Edge's online neural voices by default, on both Mac and Windows. Or this computer's own voices, offline. If the online voices can't be reached, the computer's voice reads instead.
 - **Remote windows.** In SSH, WSL and container windows the extension still runs on your own machine, where the speakers are.
 
 ## Commands
@@ -43,34 +43,39 @@ Change any shortcut in **Keyboard Shortcuts** (`Cmd+K Cmd+S`). Search for "Read 
 
 <!-- Every setting in package.json is listed here. A test checks. -->
 
-| Setting                                | Default           | What it does                                                                                       |
-| -------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
-| `readAloud2Me.voice`                   | empty             | The voice to read with. Empty means your computer's default voice                                  |
-| `readAloud2Me.speed`                   | `1`               | Reading speed, from `0.5` to `2`                                                                   |
-| `readAloud2Me.markdown.skipCodeBlocks` | `true`            | Leave out code blocks in Markdown                                                                  |
-| `readAloud2Me.withoutSelection`        | `cursorToEnd`     | With nothing selected: read from the cursor (`cursorToEnd`) or the whole file (`wholeFile`)        |
-| `readAloud2Me.reader.openOnStart`      | `false`           | Open the reader panel each time reading starts                                                     |
-| `readAloud2Me.player.show`             | `true`            | Show the player buttons in the editor title bar while reading                                      |
-| `readAloud2Me.highlight`               | `wordAndSentence` | Mark the word and sentence (`wordAndSentence`), the sentence only (`sentence`), or nothing (`off`) |
+| Setting                                | Default                       | What it does                                                                                         |
+| -------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `readAloud2Me.voiceSource`             | `online`                      | `online` for Edge's natural voices (needs internet), `computer` for this computer's voices (offline) |
+| `readAloud2Me.onlineVoice`             | `en-US-AvaMultilingualNeural` | The online voice                                                                                     |
+| `readAloud2Me.voice`                   | empty                         | The computer voice, used when the source is `computer`. Empty means your computer's default voice    |
+| `readAloud2Me.speed`                   | `1`                           | Reading speed, from `0.5` to `2`                                                                     |
+| `readAloud2Me.markdown.skipCodeBlocks` | `true`                        | Leave out code blocks in Markdown                                                                    |
+| `readAloud2Me.withoutSelection`        | `cursorToEnd`                 | With nothing selected: read from the cursor (`cursorToEnd`) or the whole file (`wholeFile`)          |
+| `readAloud2Me.reader.openOnStart`      | `false`                       | Open the reader panel each time reading starts                                                       |
+| `readAloud2Me.player.show`             | `true`                        | Show the player buttons in the editor title bar while reading                                        |
+| `readAloud2Me.highlight`               | `wordAndSentence`             | Mark the word and sentence (`wordAndSentence`), the sentence only (`sentence`), or nothing (`off`)   |
 
 The voice setting stays on this computer and is not synced, because Mac and Windows voices have different names.
 
-## Better voices
+## Voices
 
-The voices that come with the computer can sound flat. Both systems offer better ones for free.
+Run **Read Aloud 2 Me: Pick Voice**. The list has two groups:
 
-**macOS:** the most natural voices are Siri's. Open **System Settings**, then **Accessibility**, then **Read & Speak** (called **Spoken Content** before macOS 26). Set **System voice** to a **Siri** voice. Then run **Read Aloud 2 Me: Pick Voice** and choose **System voice**: Siri voices can only be used this way, not picked by name. Enhanced and Premium voices, such as "Ava (Premium)", also sound good; once downloaded they appear in **Pick Voice**, best first.
-
-**Windows:** open **Settings**, then **Time & language**, then **Speech**, and add voices under **Manage voices**. Read Aloud 2 Me can use the voices Windows offers to desktop apps (for example Microsoft David and Zira). The newer Narrator "natural" voices are not open to other apps.
+- **Online voices** are Microsoft Edge's neural voices. They sound the most natural and work on Mac and Windows alike. Voices in your language come first; "multilingual" voices such as Ava and Andrew read many languages well.
+- **This computer's voices** work offline. On a Mac the most natural ones are Siri's: set a Siri voice as the **System voice** in **System Settings > Accessibility > Read & Speak**, then choose **System voice** here. On Windows, add voices in **Settings > Time & language > Speech**.
 
 ## Privacy
 
-Read Aloud 2 Me makes no network calls and collects nothing. Text goes from VS Code to your computer's own speech tool and nowhere else.
+- **Online voices (the default):** the sentences being read are sent to Microsoft's speech service to be turned into audio, the same way Edge's "Read aloud" works. Nothing else is sent: no file names, no other text, no account.
+- **This computer's voices:** nothing leaves your computer.
+
+The extension collects no telemetry. Set `readAloud2Me.voiceSource` to `computer` to keep everything offline.
 
 ## Troubleshooting
 
+- **Online voices don't play.** Check your internet connection, or a firewall blocking `speech.platform.bing.com`. The computer's voice reads instead until they're back.
 - **Nothing happens on `Cmd+'`.** Another extension may use the same key, or your keyboard layout may put `'` elsewhere. Open **Keyboard Shortcuts** and bind **Read Aloud 2 Me: Read Aloud or Stop** to a key you like.
-- **There is a short wait before speech starts.** The macOS speech tool takes about a second to start. Pause, next and previous on macOS have the same wait.
+- **There is a short wait before speech starts.** Online voices take a second or two to download the first sentence; the rest are fetched ahead. The macOS speech tool also takes about a second to start.
 - **Windows: "security policy blocks PowerShell".** Your organisation limits PowerShell, so the extension can't reach the voices. Ask your IT team.
 - **Details.** Open the **Output** panel and choose **Read Aloud 2 Me**. The log never contains your text.
 

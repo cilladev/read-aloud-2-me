@@ -41,6 +41,12 @@ Each `Sentence` carries the exact text sent to the engine and a list of `Piece`s
 
 ## Speech engines
 
+`speech/switching-engine.ts` picks the source per run: online (default) or computer. An online run that fails with `networkFailed` before any sentence plays is replayed on the computer engine.
+
+- **Online** (`speech/online/`): `edge-synthesizer.ts` downloads each sentence as MP3 with word timings from Edge's neural voices; `online-engine.ts` fetches a few sentences ahead and plays each file with `afplay` (macOS) or the PowerShell host's media player (Windows). Word events come from timers set from the word timings. Pause stops playback and remembers the position; resume plays the rest of the same MP3, cut at a frame (`mp3.ts`).
+
+### Computer voices
+
 Both engines speak a list of sentences in order and report `onSentenceStart(index)` and `onWord({ sentence, start, length })`.
 
 - **macOS** joins the sentences into one line (line breaks reset `say`'s offsets) and runs `say -i`, which prints each word as it is spoken. `say` takes about 1.5 s to start, so one process reads the whole run. `say` can't pause, so pause stops it and resume starts again from the current word.

@@ -4,7 +4,7 @@
  * checked against the installed list, and the user is told once.
  */
 import * as vscode from "vscode";
-import type { SpeechEngine, Voice } from "../speech/engine";
+import type { Voice } from "../speech/engine";
 
 /** Caches the voice list and remembers a configured voice that is not installed. */
 export class VoiceGuard {
@@ -14,17 +14,17 @@ export class VoiceGuard {
   private missing: string | undefined;
 
   /**
-   * @param engine - lists the installed voices
+   * @param list - lists this computer's installed voices
    * @param log - the extension's log channel
    */
   constructor(
-    private readonly engine: SpeechEngine,
+    private readonly list: () => Promise<readonly Voice[]>,
     private readonly log: vscode.LogOutputChannel,
   ) {}
 
   /** Lists installed voices. `fresh` lists again instead of using the cache. */
   installed(fresh = false): Promise<readonly Voice[]> {
-    const voices = (fresh ? undefined : this.voices) ?? this.engine.listVoices();
+    const voices = (fresh ? undefined : this.voices) ?? this.list();
     this.voices = voices;
     void voices.catch(() => {
       // Listing failed: forget it so the next call tries again. The caller reports the error.

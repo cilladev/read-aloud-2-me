@@ -1,7 +1,7 @@
 {
   "name": "read-aloud-2-me",
   "displayName": "Read Aloud 2 Me",
-  "description": "Select text, press a shortcut, and hear it in your computer's own voice. Offline. Markdown is read as plain text.",
+  "description": "Select text, press a shortcut, and hear it in a natural voice. Markdown is read as plain text.",
   "version": "0.0.0",
   "publisher": "cilladev",
   "author": {
@@ -179,6 +179,12 @@
         "when": "editorTextFocus || activeWebviewPanelId == 'markdown.preview' || activeWebviewPanelId == 'readAloud2Me.reader' || readAloud2Me.isReading"
       },
       {
+        "command": "readAloud2Me.toggle",
+        "key": "ctrl+[Quote]",
+        "mac": "cmd+[Quote]",
+        "when": "editorTextFocus || activeWebviewPanelId == 'markdown.preview' || activeWebviewPanelId == 'readAloud2Me.reader' || readAloud2Me.isReading"
+      },
+      {
         "command": "readAloud2Me.stop",
         "key": "escape",
         "when": "readAloud2Me.isReading && !suggestWidgetVisible && !findWidgetVisible && !inlineChatVisible && !inQuickOpen && !renameInputVisible && !parameterHintsVisible && !inSnippetMode && !notificationToastsVisible"
@@ -187,11 +193,29 @@
     "configuration": {
       "title": "Read Aloud 2 Me",
       "properties": {
+        "readAloud2Me.voiceSource": {
+          "type": "string",
+          "enum": [
+            "online",
+            "computer"
+          ],
+          "enumDescriptions": [
+            "Natural neural voices from Microsoft Edge's online service. Needs internet; the text being read is sent to Microsoft.",
+            "The voices installed on this computer. Works offline; text stays on the computer."
+          ],
+          "default": "online",
+          "description": "Where voices come from."
+        },
+        "readAloud2Me.onlineVoice": {
+          "type": "string",
+          "default": "en-US-AvaMultilingualNeural",
+          "markdownDescription": "The online voice, such as `en-US-AvaMultilingualNeural`. Use **Read Aloud 2 Me: Pick Voice** to choose one."
+        },
         "readAloud2Me.voice": {
           "type": "string",
           "default": "",
           "scope": "machine",
-          "markdownDescription": "The voice to read with. Leave empty for your computer's default voice. Use **Read Aloud 2 Me: Pick Voice** to choose from the voices installed on this computer."
+          "markdownDescription": "The voice on this computer to read with, used when **Voice Source** is `computer`. Leave empty for your computer's default voice. Use **Read Aloud 2 Me: Pick Voice** to choose one."
         },
         "readAloud2Me.speed": {
           "type": "number",
@@ -292,7 +316,8 @@
     "mdast-util-frontmatter": "^2.0.1",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-frontmatter": "^2.0.0",
-    "micromark-extension-gfm": "^3.0.0"
+    "micromark-extension-gfm": "^3.0.0",
+    "msedge-tts": "^2.1.1"
   },
   "icon": "media/icon.png",
   "galleryBanner": {

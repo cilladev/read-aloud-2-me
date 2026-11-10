@@ -26,6 +26,8 @@ export type HostRequest =
   | { readonly type: "pause" }
   | { readonly type: "resume" }
   | { readonly type: "cancel"; readonly run: number }
+  | { readonly type: "play"; readonly id: number; readonly path: string }
+  | { readonly type: "stopAudio" }
   | { readonly type: "quit" };
 
 /** Error codes the host can report. */

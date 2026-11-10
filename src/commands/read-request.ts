@@ -2,7 +2,7 @@
  * Turns what the user is looking at into sentences to read: the selection, or the text from the
  * cursor, or the whole file. The only code that reads the editor selection.
  */
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import type { Settings } from "../config/settings";
 import { textKindForLanguage, toSentences } from "../text/prepare";
 import type { Sentence } from "../text/types";
@@ -89,4 +89,30 @@ export function startsParagraph(fullText: string, previousEnd: number, start: nu
 /** Last path segment of a URI, for titles. */
 export function fileName(uri: vscode.Uri): string {
   return uri.path.split("/").pop() ?? uri.path;
+}
+
+/** The request's sentences for the reader panel, marking where paragraphs start. */
+export function readerSentences(request: ReadRequest): { text: string; paragraphStart: boolean }[] {
+  return request.sentences.map((sentence, index) => {
+    const previous = request.sentences[index - 1];
+    return {
+      text: sentence.text,
+      paragraphStart:
+        previous !== undefined && startsParagraph(request.fullText, previous.sourceEnd, sentence.sourceStart),
+    };
+  });
+}
+
+/**
+ * Collapses the selection to its start once reading begins. VS Code draws the selection over
+ * the reading highlights, so leaving it would hide the word and sentence being read.
+ */
+export function clearSelection(editor: vscode.TextEditor | undefined, request: ReadRequest): void {
+  if (editor && editor.document === request.document && !editor.selection.isEmpty) {
+    const start = editor.selections.reduce(
+      (first, s) => (s.start.isBefore(first) ? s.start : first),
+      editor.selection.start,
+    );
+    editor.selection = new vscode.Selection(start, start);
+  }
 }

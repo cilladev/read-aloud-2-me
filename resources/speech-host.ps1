@@ -7,7 +7,7 @@
 #
 # Protocol: one JSON object per line, UTF-8 without BOM, both ways. The full list of
 # messages is in src/speech/windows-protocol.ts.
-#   stdin : voices | speak (one per sentence) | pause | resume | cancel | quit
+#   stdin : voices | speak (one per sentence) | pause | resume | cancel | play | stopAudio | quit
 #   stdout: ready | voices | sentenceStart | word | sentenceEnd | error
 # User text only ever arrives on stdin. This script must not take text as an argument,
 # must not write anything to stdout except protocol lines, and must not swallow errors:
@@ -130,6 +130,42 @@ function Invoke-Resume {
     if ($synth.State -eq 'Paused') { $synth.Resume() }
 }
 
+# Plays an audio file (the online voices' MP3) with WPF's MediaPlayer, which uses Windows'
+# own media codecs. Loaded on first use so system-voice reading never pays for it. The
+# engine times the audio itself, so only play and stop are needed here.
+function Invoke-Play($request) {
+    $id = [int]$request.id
+    try {
+        if ($null -eq $script:player) {
+            Add-Type -AssemblyName PresentationCore
+            Add-Type -AssemblyName WindowsBase
+            $script:player = New-Object System.Windows.Media.MediaPlayer
+        }
+        $script:player.Stop()
+        $script:player.Open([uri]([string]$request.path))
+        $script:player.Play()
+    } catch {
+        Send-Failure 'processFailed' ('Audio playback failed: ' + $_.Exception.Message) $id
+    }
+}
+
+function Invoke-StopAudio {
+    if ($null -ne $script:player) {
+        $script:player.Stop()
+        $script:player.Close()
+    }
+}
+
+# MediaPlayer posts its work to this thread's dispatcher; run pending work so playback proceeds.
+function Invoke-DispatcherWork {
+    if ($null -ne $script:player) {
+        $frame = New-Object System.Windows.Threading.DispatcherFrame
+        $callback = [System.Windows.Threading.DispatcherOperationCallback] { param($f) $f.Continue = $false; return $null }
+        [void][System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke('Background', $callback, $frame)
+        [System.Windows.Threading.Dispatcher]::PushFrame($frame)
+    }
+}
+
 function Invoke-Request([string]$line) {
     if ($line.Trim() -eq '') { return }
     try {
@@ -144,6 +180,8 @@ function Invoke-Request([string]$line) {
         'pause' { Invoke-Pause }
         'resume' { Invoke-Resume }
         'cancel' { Invoke-Cancel $request }
+        'play' { Invoke-Play $request }
+        'stopAudio' { Invoke-StopAudio }
         'quit' { $script:quit = $true }
         default { Send-Failure 'processFailed' ('Unknown request type: ' + [string]$request.type) $null }
     }
@@ -199,6 +237,7 @@ try {
     $prompts = New-Object 'System.Collections.Generic.Dictionary[object,object]'
     $script:quit = $false
     $script:pausePending = $false
+    $script:player = $null
     [void](Register-ObjectEvent -InputObject $synth -EventName SpeakStarted -SourceIdentifier 'ReadAloud2Me.Started')
     [void](Register-ObjectEvent -InputObject $synth -EventName SpeakProgress -SourceIdentifier 'ReadAloud2Me.Progress')
     [void](Register-ObjectEvent -InputObject $synth -EventName SpeakCompleted -SourceIdentifier 'ReadAloud2Me.Completed')
@@ -224,6 +263,11 @@ while (-not $script:quit) {
         }
     }
     Read-SpeechEvents
+    try {
+        Invoke-DispatcherWork
+    } catch {
+        Send-Failure 'processFailed' ('Audio dispatcher failed: ' + $_.Exception.Message) $null
+    }
     if ($eof -and $lines.IsEmpty) {
         if ($null -ne $state.Error) { Send-Failure 'processFailed' ('Reading stdin failed: ' + $state.Error) $null }
         break
@@ -232,6 +276,7 @@ while (-not $script:quit) {
 }
 
 try {
+    Invoke-StopAudio
     $synth.SpeakAsyncCancelAll()
     Get-EventSubscriber | Unregister-Event
     $synth.Dispose()

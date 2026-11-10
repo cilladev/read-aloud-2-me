@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { readSettings } from "./config/settings";
 import { ReadingController } from "./commands/reading-controller";
 import { registerCommands } from "./commands/register-commands";
 import { ReaderPanel } from "./reader/reader-panel";
@@ -20,7 +21,21 @@ export interface ReadAloud2MeApi {
  */
 export function activate(context: vscode.ExtensionContext): ReadAloud2MeApi {
   const log = vscode.window.createOutputChannel("Read Aloud 2 Me", { log: true });
-  const engine = createEngine(process.platform, vscode.Uri.joinPath(context.extensionUri, "resources").fsPath);
+  let onFallback: (error: Error) => void = () => undefined;
+  const engine = createEngine(
+    process.platform,
+    vscode.Uri.joinPath(context.extensionUri, "resources").fsPath,
+    {
+      source: () => readSettings().voiceSource,
+      computerVoice: () => readSettings().voice,
+      onFallback: (error) => {
+        onFallback(error);
+      },
+    },
+    (message) => {
+      log.warn(message);
+    },
+  );
   const shortcut = process.platform === "darwin" ? "Cmd+'" : "Ctrl+'";
   const reader = new ReaderPanel(
     context.extensionUri,
@@ -31,6 +46,9 @@ export function activate(context: vscode.ExtensionContext): ReadAloud2MeApi {
     },
   );
   const controller = new ReadingController(engine, reader, log);
+  onFallback = (error) => {
+    controller.notifyFallback(error);
+  };
   const api: ReadAloud2MeApi = {
     get state() {
       return controller.state;

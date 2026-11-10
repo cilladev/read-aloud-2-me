@@ -302,3 +302,7 @@ Not verified, needs a person:
 - Markdown preview selection reading.
 - SSH or WSL remote windows, and forks (Cursor, VSCodium).
 - Personal Voice on macOS.
+
+## 8. Change: online voices (2026-11-10)
+
+The user chose natural voices over the offline-only promise. Decision D12: Microsoft Edge's online neural voices are the default source on both platforms, through `msedge-tts`, with the computer's voices as an offline setting and automatic fallback. The endpoint is not an official public API and may change; updating `msedge-tts` is the fix when it does.

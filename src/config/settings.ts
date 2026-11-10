@@ -3,6 +3,7 @@
  * everything else asks this module. Does not cache: each read reflects the user's settings now.
  */
 import * as vscode from "vscode";
+import type { VoiceSource } from "../speech/switching-engine";
 
 /** The settings section; every key below lives under it. */
 export const SECTION = "readAloud2Me";
@@ -13,9 +14,16 @@ export type WithoutSelection = "cursorToEnd" | "wholeFile";
 /** How much of the reading to mark in the editor. */
 export type HighlightMode = "wordAndSentence" | "sentence" | "off";
 
+/** The online voice used when none is set. */
+export const DEFAULT_ONLINE_VOICE = "en-US-AvaMultilingualNeural";
+
 /** All settings, already validated and defaulted. */
 export interface Settings {
-  /** Voice id, or undefined for the system default voice. */
+  /** Online voices or this computer's voices. */
+  readonly voiceSource: VoiceSource;
+  /** Online voice id, such as "en-US-AvaMultilingualNeural". */
+  readonly onlineVoice: string;
+  /** Computer voice id, or undefined for the system default voice. */
   readonly voice: string | undefined;
   /** Speed multiplier, 0.5 to 2. */
   readonly speed: number;
@@ -34,7 +42,10 @@ export const MAX_SPEED = 2;
 export function readSettings(): Settings {
   const config = vscode.workspace.getConfiguration(SECTION);
   const voice = config.get<string>("voice", "").trim();
+  const onlineVoice = config.get<string>("onlineVoice", DEFAULT_ONLINE_VOICE).trim();
   return {
+    voiceSource: oneOf(config.get<string>("voiceSource"), ["online", "computer"], "online"),
+    onlineVoice: onlineVoice === "" ? DEFAULT_ONLINE_VOICE : onlineVoice,
     voice: voice === "" ? undefined : voice,
     speed: clampSpeed(config.get<number>("speed", 1)),
     skipCodeBlocks: config.get<boolean>("markdown.skipCodeBlocks", true),
@@ -44,9 +55,15 @@ export function readSettings(): Settings {
   };
 }
 
-/** Saves the voice in the user's global settings. An empty string means the system default. */
-export async function saveVoice(voice: string): Promise<void> {
-  await vscode.workspace.getConfiguration(SECTION).update("voice", voice, vscode.ConfigurationTarget.Global);
+/**
+ * Saves a voice choice in the user's global settings.
+ * @param source - where the voice comes from
+ * @param voice - the voice id; for the computer, an empty string means the system voice
+ */
+export async function saveVoice(source: VoiceSource, voice: string): Promise<void> {
+  const config = vscode.workspace.getConfiguration(SECTION);
+  await config.update(source === "online" ? "onlineVoice" : "voice", voice, vscode.ConfigurationTarget.Global);
+  await config.update("voiceSource", source, vscode.ConfigurationTarget.Global);
 }
 
 /** Saves the speed in the user's global settings, clamped to the allowed range. */
@@ -58,7 +75,9 @@ export async function saveSpeed(speed: number): Promise<void> {
 
 /** True when a configuration change touches voice or speed, which restart the sentence. */
 export function affectsVoiceOrSpeed(event: vscode.ConfigurationChangeEvent): boolean {
-  return event.affectsConfiguration(`${SECTION}.voice`) || event.affectsConfiguration(`${SECTION}.speed`);
+  return ["voice", "onlineVoice", "voiceSource", "speed"].some((key) =>
+    event.affectsConfiguration(`${SECTION}.${key}`),
+  );
 }
 
 /** True when a configuration change touches any of this extension's settings. */
