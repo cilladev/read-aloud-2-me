@@ -17,7 +17,7 @@ With nothing selected, reading starts at the cursor and goes to the end of the f
 - **Any file.** Plain text is read as is. In code, comment markers are left out.
 - **Follow along.** The sentence being read is marked in the editor, the current word stands out, and text already read is dimmed.
 - **Player.** While reading, the editor title bar has previous, pause, next, stop and reader buttons. The status bar shows the place ("3 of 12"), speed and voice; click them to stop or change.
-- **Reader panel.** **Open Reader to the Side** shows clean sentences beside your code. Click a sentence to read from there. Text size can be changed.
+- **Reader panel.** **Open Reader to the Side** shows the text beside your editor. Markdown keeps its formatting (headings, lists, tables, code); other files show clean sentences. The sentence and word being read are lit. Click a sentence to read from there. Text size can be changed.
 - **Markdown preview.** Select text in the preview and press the shortcut.
 - **Remote windows.** In SSH, WSL and container windows it runs on your own machine, where the speakers are.
 
@@ -33,7 +33,7 @@ Run **Read Aloud 2 Me: Pick Voice**. It lists two groups:
 - **Online voices:** the sentences being read are sent to Microsoft's speech service, the same way Edge's "Read aloud" works. Nothing else is sent.
 - **This computer's voices:** nothing leaves your computer. Set **Voice Source** to `computer` to stay offline.
 
-There is no telemetry.
+There is no telemetry. Online audio is kept in a temporary folder only while it is read, then deleted.
 
 ## Commands
 

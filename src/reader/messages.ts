@@ -39,6 +39,8 @@ export interface RenderMessage {
   readonly fontSize: number;
   /** One-line hint shown when there are no sentences. */
   readonly emptyHint: string;
+  /** The formatted Markdown view. When absent, the sentences are shown as plain paragraphs. */
+  readonly markdown?: readonly ViewNode[];
 }
 
 /** Move the lit sentence and, optionally, the lit word. */
@@ -46,7 +48,10 @@ export interface ProgressMessage {
   readonly type: "progress";
   /** Index of the sentence being read, or -1 when not reading. */
   readonly current: number;
+  /** The word inside the current sentence's text, for the plain view. */
   readonly word?: WordRange;
+  /** The word as a source range, for the formatted Markdown view. */
+  readonly wordSource?: SourceSpan;
 }
 
 /** Set the text size. */
@@ -57,6 +62,64 @@ export interface FontSizeMessage {
 
 /** Everything the host sends to the webview. */
 export type HostToWebview = RenderMessage | ProgressMessage | FontSizeMessage;
+
+/** Elements the reader may draw for Markdown. The webview refuses anything else. */
+export type ViewTag =
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6"
+  | "p"
+  | "strong"
+  | "em"
+  | "del"
+  | "code"
+  | "pre"
+  | "a"
+  | "ul"
+  | "ol"
+  | "li"
+  | "blockquote"
+  | "table"
+  | "thead"
+  | "tbody"
+  | "tr"
+  | "th"
+  | "td"
+  | "hr"
+  | "br"
+  | "sup"
+  | "span";
+
+/** An element of the formatted Markdown view. */
+export interface ViewElement {
+  readonly tag: ViewTag;
+  /** A class from a fixed set: "image", "task", "task-done", "footnote". */
+  readonly className?: string;
+  /** For `ol`: the number of the first item. */
+  readonly start?: number;
+  readonly children: readonly ViewNode[];
+}
+
+/** A run of text in the formatted view. */
+export interface ViewText {
+  readonly text: string;
+  /** The sentence this text is part of, when it is spoken. */
+  readonly sentence?: number;
+  /** Source offset of the first character, when the text is exactly the source. */
+  readonly source?: number;
+}
+
+/** One node of the formatted Markdown view. */
+export type ViewNode = ViewElement | ViewText;
+
+/** A range of the source document, end exclusive. */
+export interface SourceSpan {
+  readonly start: number;
+  readonly end: number;
+}
 
 /** Everything the webview sends to the host. */
 export type WebviewToHost =

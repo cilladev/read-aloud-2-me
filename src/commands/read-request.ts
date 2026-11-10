@@ -4,6 +4,8 @@
  */
 import * as vscode from "vscode";
 import type { Settings } from "../config/settings";
+import { buildMarkdownView } from "../reader/markdown-view";
+import type { ViewNode } from "../reader/messages";
 import { textKindForLanguage, toSentences } from "../text/prepare";
 import type { Sentence } from "../text/types";
 
@@ -91,6 +93,18 @@ export function fileName(uri: vscode.Uri): string {
   return uri.path.split("/").pop() ?? uri.path;
 }
 
+/**
+ * The formatted view for the reader panel when the request is a Markdown document, so the
+ * reader keeps headings, lists and emphasis. Undefined for other text, shown as plain sentences.
+ */
+export function markdownView(request: ReadRequest): readonly ViewNode[] | undefined {
+  const document = request.document;
+  if (document === undefined || textKindForLanguage(document.languageId) !== "markdown") {
+    return undefined;
+  }
+  return buildMarkdownView(request.fullText, request.sentences);
+}
+
 /** The request's sentences for the reader panel, marking where paragraphs start. */
 export function readerSentences(request: ReadRequest): { text: string; paragraphStart: boolean }[] {
   return request.sentences.map((sentence, index) => {
@@ -115,4 +129,10 @@ export function clearSelection(editor: vscode.TextEditor | undefined, request: R
     );
     editor.selection = new vscode.Selection(start, start);
   }
+}
+
+/** True when the focused tab is this extension's reader panel. */
+export function isReaderActive(): boolean {
+  const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  return input instanceof vscode.TabInputWebview && input.viewType.endsWith("readAloud2Me.reader");
 }

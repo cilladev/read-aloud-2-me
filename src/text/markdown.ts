@@ -4,7 +4,7 @@
  * Pure: no vscode, no I/O.
  */
 
-import type { Code, Nodes, Table, TableRow } from "mdast";
+import type { Code, Nodes, Root, Table, TableRow } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { gfmFromMarkdown } from "mdast-util-gfm";
@@ -33,13 +33,22 @@ interface Walk {
  * // ["Setup.", "Run npm ci.", "Then test."]
  */
 export function markdownToSentences(source: string, options: TextOptions): Sentence[] {
-  const tree = fromMarkdown(source, {
-    extensions: [gfm(), frontmatter([...FRONT_MATTER])],
-    mdastExtensions: [gfmFromMarkdown(), frontmatterFromMarkdown([...FRONT_MATTER])],
-  });
+  const tree = parseMarkdown(source);
   const walk: Walk = { source, options, out: [] };
   walkBlock(tree, walk, false);
   return walk.out;
+}
+
+/**
+ * Parses Markdown (with GitHub tables, task lists, footnotes and front matter) into a syntax
+ * tree whose nodes keep their source offsets. Shared with the reader panel, so what is shown and
+ * what is spoken come from the same parse.
+ */
+export function parseMarkdown(source: string): Root {
+  return fromMarkdown(source, {
+    extensions: [gfm(), frontmatter([...FRONT_MATTER])],
+    mdastExtensions: [gfmFromMarkdown(), frontmatterFromMarkdown([...FRONT_MATTER])],
+  });
 }
 
 // `inItem` is true inside a list item, whose paragraphs end with a pause.

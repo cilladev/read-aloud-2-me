@@ -21,5 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Natural online voices from Microsoft Edge, on Mac and Windows, with the computer's own voices as an offline option and automatic fallback.
 - The word being read stands out more, and the selection no longer hides the highlights.
 - Online voices on Windows: the highlight follows the voice, sentences no longer cut off early, and the next sentence starts without a pause.
+- The reader panel shows Markdown with its formatting: headings, emphasis, lists, tables, quotes and code, with the sentence and word being read lit inside it.
+- Temporary audio from the online voices is always cleaned up, including after a crash.
 - Fixed: on Windows, next, previous and changing voice or speed while reading no longer fail with "directory not empty".
 - `Ctrl+'` also works on Windows keyboard layouts that report the quote key differently.

@@ -19,12 +19,10 @@ import { EditorHighlighter } from "../ui/highlighter";
 import { pickSpeed, pickVoice } from "../ui/quick-picks";
 import { ReadingStatusBar } from "../ui/status-bar";
 import { isMarkdownPreviewActive, requestFromPreview } from "./preview-request";
-import { clearSelection, readerSentences, requestFromEditor } from "./read-request";
+import { clearSelection, isReaderActive, markdownView, readerSentences, requestFromEditor } from "./read-request";
 import type { ReadRequest } from "./read-request";
 import { showSpeechError } from "./speech-errors";
 import { VoiceGuard } from "./voice-guard";
-
-const READER_VIEW_TYPE = "readAloud2Me.reader";
 
 /** Owns one reading session and everything that shows it. */
 export class ReadingController implements vscode.Disposable {
@@ -238,7 +236,7 @@ export class ReadingController implements vscode.Disposable {
     if (editor) {
       return requestFromEditor(editor, settings);
     }
-    if (this.isReaderActive() && this.request) {
+    if (isReaderActive() && this.request) {
       return { ...this.request, startIndex: 0 };
     }
     void vscode.window.showInformationMessage("Open a file and select text to read it aloud.");
@@ -250,7 +248,7 @@ export class ReadingController implements vscode.Disposable {
     this.startIndex = from;
     this.tracked = [...request.sentences];
     this.highlighter.attach(request.document);
-    this.reader.setDocument(request.title, readerSentences(request));
+    this.reader.setDocument(request.title, readerSentences(request), markdownView(request));
     if (readSettings().openReaderOnStart) {
       this.reader.show();
     }
@@ -298,8 +296,13 @@ export class ReadingController implements vscode.Disposable {
   }
 
   private onWord(word: SessionWord): void {
-    this.reader.setProgress(word.sentence, { start: word.start, length: word.length });
     const sentence = this.tracked[word.sentence];
+    const original = this.request?.sentences[word.sentence];
+    this.reader.setProgress(
+      word.sentence,
+      { start: word.start, length: word.length },
+      original ? mapSpokenRange(original, word.start, word.length) : undefined,
+    );
     if (!sentence || this.settings.highlight !== "wordAndSentence") {
       return;
     }
@@ -348,10 +351,5 @@ export class ReadingController implements vscode.Disposable {
         settings.voiceSource === "online" ? onlineVoiceName(settings.onlineVoice) : this.voices.usable(settings.voice),
       sentence: this.request?.sentences[this.session.current]?.text,
     });
-  }
-
-  private isReaderActive(): boolean {
-    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-    return input instanceof vscode.TabInputWebview && input.viewType.endsWith(READER_VIEW_TYPE);
   }
 }

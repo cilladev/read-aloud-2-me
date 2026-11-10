@@ -2,7 +2,7 @@ import * as assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { removeFolder } from "../../../speech/online/online-engine";
+import { removeFolder } from "../../../speech/online/temp-audio";
 import { WindowsMediaPlayer } from "../../../speech/online/windows-media-player";
 import { WindowsSapiEngine } from "../../../speech/windows-sapi-engine";
 import { fakeMp3 } from "./online/mp3-frames";

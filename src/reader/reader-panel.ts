@@ -12,6 +12,8 @@ import {
   parseWebviewMessage,
   type HostToWebview,
   type ReaderSentence,
+  type SourceSpan,
+  type ViewNode,
   type WebviewToHost,
   type WordRange,
 } from "./messages";
@@ -29,6 +31,8 @@ export class ReaderPanel implements vscode.Disposable {
   private sentences: readonly ReaderSentence[] = [];
   private current = -1;
   private word: WordRange | undefined;
+  private wordSource: SourceSpan | undefined;
+  private markdown: readonly ViewNode[] | undefined;
   private fontSize: number;
   private readonly jumpEmitter = new vscode.EventEmitter<number>();
 
@@ -68,12 +72,15 @@ export class ReaderPanel implements vscode.Disposable {
    * Show new reading content. Nothing is lit until {@link setProgress} is called.
    * @param title - The file name; only its last path segment is shown.
    * @param sentences - The sentences in reading order.
+   * @param markdown - The formatted Markdown view, for Markdown files; plain sentences otherwise.
    */
-  setDocument(title: string, sentences: readonly ReaderSentence[]): void {
+  setDocument(title: string, sentences: readonly ReaderSentence[], markdown?: readonly ViewNode[]): void {
     this.title = basename(title);
     this.sentences = sentences.map((s) => ({ text: s.text, paragraphStart: s.paragraphStart }));
+    this.markdown = markdown;
     this.current = -1;
     this.word = undefined;
+    this.wordSource = undefined;
     this.updateTitle();
     this.postRender();
   }
@@ -82,10 +89,12 @@ export class ReaderPanel implements vscode.Disposable {
    * Light a sentence and, optionally, a word in it. Cheap: skipped while the panel is hidden.
    * @param current - Sentence index, or -1 when not reading. Out-of-range values mean -1.
    * @param word - The word being spoken, as offsets into that sentence's text.
+   * @param wordSource - The same word as a source range, for the formatted Markdown view.
    */
-  setProgress(current: number, word?: WordRange): void {
+  setProgress(current: number, word?: WordRange, wordSource?: SourceSpan): void {
     this.current = Number.isInteger(current) && current >= 0 && current < this.sentences.length ? current : -1;
     this.word = this.current >= 0 && word ? { start: word.start, length: word.length } : undefined;
+    this.wordSource = this.current >= 0 && wordSource ? { start: wordSource.start, end: wordSource.end } : undefined;
     this.post(this.progressMessage());
   }
 
@@ -173,23 +182,27 @@ export class ReaderPanel implements vscode.Disposable {
   }
 
   private postRender(): void {
-    this.post({
+    const render: HostToWebview = {
       type: "render",
       title: panelTitle(this.title),
       sentences: this.sentences,
       current: this.current,
       fontSize: this.fontSize,
       emptyHint: this.emptyHint,
-    });
+    };
+    this.post(this.markdown === undefined ? render : { ...render, markdown: this.markdown });
     if (this.word) {
       this.post(this.progressMessage());
     }
   }
 
   private progressMessage(): HostToWebview {
-    return this.word
-      ? { type: "progress", current: this.current, word: this.word }
-      : { type: "progress", current: this.current };
+    return {
+      type: "progress",
+      current: this.current,
+      ...(this.word ? { word: this.word } : {}),
+      ...(this.wordSource ? { wordSource: this.wordSource } : {}),
+    };
   }
 
   private post(message: HostToWebview): void {

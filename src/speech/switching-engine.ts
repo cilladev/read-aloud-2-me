@@ -3,8 +3,8 @@
  * to the computer's voices when the online ones can't be reached before anything has played.
  * Callers see one {@link SpeechEngine}. Must not import vscode.
  */
+import { SpeechError } from "./engine";
 import type { EngineCapabilities, RunEnd, RunListener, SpeakOptions, SpeechEngine, SpeechRun, Voice } from "./engine";
-import { isNetworkFailure } from "./online/online-engine";
 
 /** Where voices come from: Edge's online neural voices, or the ones installed on this computer. */
 export type VoiceSource = "online" | "computer";
@@ -113,4 +113,9 @@ class FallbackRun implements SpeechRun {
     this.cancelled = true;
     this.inner.cancel();
   }
+}
+
+/** True when a run failed because the online voices could not be reached. */
+export function isNetworkFailure(end: RunEnd): boolean {
+  return end.kind === "failed" && end.error instanceof SpeechError && end.error.code === "networkFailed";
 }

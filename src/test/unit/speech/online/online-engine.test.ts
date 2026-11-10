@@ -1,12 +1,15 @@
 import * as assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { SpeechError } from "../../../../speech/engine";
 import type { RunEnd, Voice, WordEvent } from "../../../../speech/engine";
 import type { AudioPlayback, AudioPlayer, PlaybackEnd } from "../../../../speech/online/audio-player";
 import { playbackSignals } from "../../../../speech/online/audio-player";
 import type { Synthesis, Synthesizer } from "../../../../speech/online/edge-synthesizer";
-import { isNetworkFailure, OnlineEngine } from "../../../../speech/online/online-engine";
+import { OnlineEngine } from "../../../../speech/online/online-engine";
+import { isNetworkFailure } from "../../../../speech/switching-engine";
+import { FOLDER_PREFIX, removeFolder, STALE_AFTER_MS, sweepStaleFolders } from "../../../../speech/online/temp-audio";
 import { mp3DurationMs } from "../../../../speech/online/mp3";
 import { fakeMp3 } from "./mp3-frames";
 
@@ -291,6 +294,30 @@ describe("OnlineEngine", () => {
       assert.equal(end.kind, "failed");
     } finally {
       rmSync(dir, { force: true });
+    }
+  });
+});
+
+describe("sweepStaleFolders", () => {
+  it("removes only our folders older than an hour", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ra2m-sweep-"));
+    const old = join(root, `${FOLDER_PREFIX}old`);
+    const fresh = join(root, `${FOLDER_PREFIX}fresh`);
+    const other = join(root, "someone-else");
+    for (const dir of [old, fresh, other]) {
+      mkdirSync(dir);
+    }
+    const hourAndABitAgo = (Date.now() - STALE_AFTER_MS - 60_000) / 1000;
+    utimesSync(old, hourAndABitAgo, hourAndABitAgo);
+    utimesSync(other, hourAndABitAgo, hourAndABitAgo);
+    try {
+      const removed = await sweepStaleFolders(root, removeFolder);
+      assert.equal(removed, 1);
+      assert.equal(existsSync(old), false);
+      assert.equal(existsSync(fresh), true);
+      assert.equal(existsSync(other), true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

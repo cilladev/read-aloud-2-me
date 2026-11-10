@@ -154,6 +154,8 @@ export default tseslint.config(
         document: "readonly",
         Element: "readonly",
         HTMLElement: "readonly",
+        HTMLOListElement: "readonly",
+        Node: "readonly",
         acquireVsCodeApi: "readonly",
       },
     },

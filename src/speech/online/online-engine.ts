@@ -6,7 +6,6 @@
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SpeechError } from "../engine";
@@ -17,22 +16,14 @@ import type { TimedWord } from "./edge-text";
 import { DEFAULT_ONLINE_VOICE } from "./edge-synthesizer";
 import type { Synthesis, Synthesizer } from "./edge-synthesizer";
 import { sliceMp3 } from "./mp3";
+import { FOLDER_PREFIX, removeFolder, sweepStaleFolders } from "./temp-audio";
+import type { FolderRemover } from "./temp-audio";
 
 /** How many sentences to download ahead of the one playing. */
 export const PREFETCH_AHEAD = 3;
 
 /** The pause left after a sentence's last word before the next sentence starts. */
 export const SENTENCE_GAP_MS = 150;
-
-/** Removes a run's folder of audio files. Must never throw; failures are for the log only. */
-export type FolderRemover = (dir: string) => Promise<void>;
-
-/**
- * Deletes a folder in the background. On Windows the media player may still hold a file for a
- * moment after it was told to close it, so deletion retries before giving up.
- */
-export const removeFolder: FolderRemover = (dir) =>
-  rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 
 /** Optional collaborators of {@link OnlineEngine}. */
 export interface OnlineEngineOptions {
@@ -72,7 +63,7 @@ class OnlineRun implements SpeechRun {
     private readonly cleanup: (dir: string) => void,
   ) {
     this.ended = new Promise((resolve) => (this.settleEnded = resolve));
-    this.dir = join(tmpdir(), `read-aloud-2-me-${randomUUID()}`);
+    this.dir = join(tmpdir(), `${FOLDER_PREFIX}${randomUUID()}`);
     void this.playSentence(0, 0);
   }
 
@@ -309,6 +300,7 @@ export class OnlineEngine implements SpeechEngine {
   /** The service reports every word's timing. */
   readonly capabilities: EngineCapabilities = { wordEvents: true };
   private current: OnlineRun | undefined;
+  private swept = false;
 
   /**
    * @param synth - downloads speech; tests pass a fake
@@ -330,11 +322,30 @@ export class OnlineEngine implements SpeechEngine {
   speak(sentences: readonly string[], options: SpeakOptions, listener: RunListener): SpeechRun {
     this.current?.cancel();
     this.options.beforeSpeak?.();
+    this.sweepOnce();
     const run = new OnlineRun(this.synth, this.player, sentences, options, listener, (dir) => {
       this.removeInBackground(dir);
     });
     this.current = run;
     return run;
+  }
+
+  /** Clears leftovers from earlier sessions, the first time this engine reads. Never blocks. */
+  private sweepOnce(): void {
+    if (this.swept) {
+      return;
+    }
+    this.swept = true;
+    sweepStaleFolders(tmpdir(), this.options.removeFolder ?? removeFolder).then(
+      (removed) => {
+        if (removed > 0) {
+          this.options.log?.(`Removed ${String(removed)} leftover temporary audio folder(s).`);
+        }
+      },
+      (error: unknown) => {
+        this.options.log?.(`Could not clear leftover temporary audio: ${String(error)}`);
+      },
+    );
   }
 
   /** Deletes a finished run's audio without ever blocking or failing the caller. */
@@ -352,9 +363,4 @@ export class OnlineEngine implements SpeechEngine {
     this.player.dispose();
     this.synth.dispose();
   }
-}
-
-/** True when a run failed because the online voices could not be reached. */
-export function isNetworkFailure(end: RunEnd): boolean {
-  return end.kind === "failed" && end.error instanceof SpeechError && end.error.code === "networkFailed";
 }
