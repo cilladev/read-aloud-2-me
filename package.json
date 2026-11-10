@@ -1,0 +1,302 @@
+{
+  "name": "read-aloud-2-me",
+  "displayName": "Read Aloud 2 Me",
+  "description": "Select text, press a shortcut, and hear it in your computer's own voice. Offline. Markdown is read as plain text.",
+  "version": "0.0.0",
+  "publisher": "cilladev",
+  "author": {
+    "name": "Priscilla Emasoga"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cilladev/read-aloud-2-me.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cilladev/read-aloud-2-me/issues"
+  },
+  "homepage": "https://github.com/cilladev/read-aloud-2-me#readme",
+  "keywords": [
+    "read aloud",
+    "text to speech",
+    "tts",
+    "markdown",
+    "accessibility"
+  ],
+  "categories": [
+    "Accessibility",
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=22.13"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "readAloud2Me.toggle",
+        "title": "Read Aloud or Stop",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "readAloud2Me.read",
+        "title": "Read Aloud",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "readAloud2Me.stop",
+        "title": "Stop Reading",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "readAloud2Me.togglePause",
+        "title": "Pause or Resume",
+        "category": "Read Aloud 2 Me"
+      },
+      {
+        "command": "readAloud2Me.pause",
+        "title": "Pause",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "readAloud2Me.resume",
+        "title": "Resume",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "readAloud2Me.previous",
+        "title": "Previous Sentence",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(chevron-left)"
+      },
+      {
+        "command": "readAloud2Me.next",
+        "title": "Next Sentence",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(chevron-right)"
+      },
+      {
+        "command": "readAloud2Me.pickVoice",
+        "title": "Pick Voice",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(person)"
+      },
+      {
+        "command": "readAloud2Me.setSpeed",
+        "title": "Set Speed",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "readAloud2Me.openReader",
+        "title": "Open Reader to the Side",
+        "category": "Read Aloud 2 Me",
+        "icon": "$(book)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "readAloud2Me.read",
+          "when": "editorHasSelection",
+          "group": "readAloud2Me@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "readAloud2Me.previous",
+          "when": "readAloud2Me.isReading && config.readAloud2Me.player.show",
+          "group": "navigation@-10"
+        },
+        {
+          "command": "readAloud2Me.pause",
+          "when": "readAloud2Me.isReading && !readAloud2Me.isPaused && config.readAloud2Me.player.show",
+          "group": "navigation@-9"
+        },
+        {
+          "command": "readAloud2Me.resume",
+          "when": "readAloud2Me.isPaused && config.readAloud2Me.player.show",
+          "group": "navigation@-9"
+        },
+        {
+          "command": "readAloud2Me.next",
+          "when": "readAloud2Me.isReading && config.readAloud2Me.player.show",
+          "group": "navigation@-8"
+        },
+        {
+          "command": "readAloud2Me.stop",
+          "when": "readAloud2Me.isReading && config.readAloud2Me.player.show",
+          "group": "navigation@-7"
+        },
+        {
+          "command": "readAloud2Me.openReader",
+          "when": "readAloud2Me.isReading && config.readAloud2Me.player.show",
+          "group": "navigation@-6"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "readAloud2Me.stop",
+          "when": "readAloud2Me.isReading"
+        },
+        {
+          "command": "readAloud2Me.togglePause",
+          "when": "readAloud2Me.isReading"
+        },
+        {
+          "command": "readAloud2Me.pause",
+          "when": "readAloud2Me.isReading && !readAloud2Me.isPaused"
+        },
+        {
+          "command": "readAloud2Me.resume",
+          "when": "readAloud2Me.isPaused"
+        },
+        {
+          "command": "readAloud2Me.previous",
+          "when": "readAloud2Me.isReading"
+        },
+        {
+          "command": "readAloud2Me.next",
+          "when": "readAloud2Me.isReading"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "readAloud2Me.toggle",
+        "key": "ctrl+'",
+        "mac": "cmd+'",
+        "when": "editorTextFocus || activeWebviewPanelId == 'markdown.preview' || activeWebviewPanelId == 'readAloud2Me.reader' || readAloud2Me.isReading"
+      },
+      {
+        "command": "readAloud2Me.stop",
+        "key": "escape",
+        "when": "readAloud2Me.isReading && !suggestWidgetVisible && !findWidgetVisible && !inlineChatVisible && !inQuickOpen && !renameInputVisible && !parameterHintsVisible && !inSnippetMode && !notificationToastsVisible"
+      }
+    ],
+    "configuration": {
+      "title": "Read Aloud 2 Me",
+      "properties": {
+        "readAloud2Me.voice": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The voice to read with. Leave empty for your computer's default voice. Use **Read Aloud 2 Me: Pick Voice** to choose from the voices installed on this computer."
+        },
+        "readAloud2Me.speed": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.5,
+          "maximum": 2,
+          "description": "Reading speed. 1 is normal, 0.5 is half speed, 2 is twice as fast."
+        },
+        "readAloud2Me.markdown.skipCodeBlocks": {
+          "type": "boolean",
+          "default": true,
+          "description": "In Markdown, leave out code blocks when reading."
+        },
+        "readAloud2Me.withoutSelection": {
+          "type": "string",
+          "enum": [
+            "cursorToEnd",
+            "wholeFile"
+          ],
+          "enumDescriptions": [
+            "Read from the sentence at the cursor to the end of the file.",
+            "Read the whole file from the top."
+          ],
+          "default": "cursorToEnd",
+          "description": "What to read when nothing is selected."
+        },
+        "readAloud2Me.reader.openOnStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the reader panel beside the editor each time reading starts."
+        },
+        "readAloud2Me.player.show": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the player buttons (previous, pause, next, stop, reader) in the editor title bar while reading."
+        },
+        "readAloud2Me.highlight": {
+          "type": "string",
+          "enum": [
+            "wordAndSentence",
+            "sentence",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Mark the sentence and the word being read.",
+            "Mark only the sentence being read.",
+            "Don't mark anything in the editor."
+          ],
+          "default": "wordAndSentence",
+          "description": "How to mark the text being read in the editor."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "compile-tests": "tsc -p . --outDir out",
+    "pretest": "npm run compile-tests && node esbuild.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "mocha --config .mocharc.json",
+    "test:integration": "vscode-test",
+    "verify": "npm run format:check && npm run check-types && npm run lint && npm test",
+    "vsix": "vsce package --out read-aloud-2-me.vsix",
+    "coverage": "npm run compile-tests && c8 mocha --config .mocharc.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/mdast": "^4.0.4",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "c8": "^12.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "mocha": "^12.0.3",
+    "npm-run-all2": "^9.0.4",
+    "ovsx": "^1.4.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2"
+  },
+  "dependencies": {
+    "mdast-util-from-markdown": "^2.1.0",
+    "mdast-util-frontmatter": "^2.0.1",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-frontmatter": "^2.0.0",
+    "micromark-extension-gfm": "^3.0.0"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1f6feb",
+    "theme": "dark"
+  }
+}

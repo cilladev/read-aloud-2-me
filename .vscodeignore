@@ -1,0 +1,27 @@
+# Only dist/, media/, the manifest, README, CHANGELOG and LICENSE ship in the .vsix.
+.vscode/**
+.vscode-test/**
+.github/**
+src/**
+out/**
+docs/**
+scripts/**
+node_modules/**
+**/*.ts
+**/*.map
+.gitignore
+.editorconfig
+.prettierrc.json
+.prettierignore
+.mocharc.json
+.vscode-test.mjs
+.nvmrc
+esbuild.js
+eslint.config.mjs
+tsconfig.json
+install.sh
+install.ps1
+AGENTS.md
+CONTRIBUTING.md
+coverage/**
+.c8rc.json

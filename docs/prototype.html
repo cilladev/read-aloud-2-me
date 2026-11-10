@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Read Aloud 2 Me</title>
+<style>
+  :root {
+    --bg: #1e1e1e; --side: #252526; --bar: #333333; --tabs: #2d2d2d; --border: #3c3c3c;
+    --text: #cccccc; --dim: #858585; --accent: #0078d4; --accent-soft: #04395e;
+    --status: #007acc; --widget: #252526; --input: #3c3c3c; --hl: #264f78; --reading: #613214;
+    --h: #569cd6; --code: #ce9178; --list: #6a9955; --kw: #c586c0; --fn: #dcdcaa; --str: #ce9178;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  button, select, input { font: inherit; color: inherit; }
+  .window { display: grid; grid-template-rows: 30px 1fr 22px; height: 100vh; }
+  .titlebar { background: var(--bar); display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 12px; position: relative; }
+  .dots { position: absolute; left: 12px; display: flex; gap: 8px; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .main { display: grid; grid-template-columns: 48px 220px 1fr; min-height: 0; }
+
+  /* Reader panel: the whole selection as clean text, the sentence being read lit up. */
+  /* Opens beside the code as a second editor group, like Markdown's "Open Preview to the Side". */
+  .group.reader { display: none; border-left: 1px solid var(--border); background: var(--bg); }
+  .with-reader .group.reader { display: grid; }
+  .reader .tabs { align-items: stretch; }
+  .reader .tabs .grow { flex: 1; }
+  .reader .tabs .tools { display: flex; align-items: center; gap: 2px; padding-right: 6px; }
+  .reader .tab .x { width: 18px; height: 18px; border: 0; background: none; color: var(--dim); border-radius: 3px; cursor: pointer; padding: 0; display: grid; place-items: center; }
+  .reader .tab .x:hover { background: #3a3d41; color: #fff; }
+  .reader .tab .x svg { width: 12px; height: 12px; }
+  .reader-body { overflow: auto; padding: 14px 20px 40px; font: 16px/1.65 Georgia, "Iowan Old Style", serif; color: #d4d4d4; }
+  .reader-body p { margin: 0 0 14px; }
+  .reader-body .s { cursor: pointer; border-radius: 3px; padding: 1px 0; transition: background .15s, color .15s; }
+  .reader-body .s:hover { background: #2f3236; }
+  .reader-body .s.done { color: #8b8b8b; }
+  .reader-body .s.now { background: var(--reading); color: #fff; }
+  .reader-empty { color: var(--dim); font: 13px/1.5 -apple-system, "Segoe UI", sans-serif; padding: 24px 20px; }
+  .activity { background: var(--bar); display: flex; flex-direction: column; align-items: center; padding-top: 8px; gap: 4px; }
+  .activity button { width: 48px; height: 44px; border: 0; background: none; color: var(--dim); cursor: pointer; border-left: 2px solid transparent; }
+  .activity button.on { color: #fff; border-left-color: #fff; }
+  .activity svg { width: 22px; height: 22px; }
+  .explorer { background: var(--side); overflow: auto; }
+  .explorer h2 { font-size: 11px; font-weight: 400; letter-spacing: .08em; margin: 0; padding: 10px 20px; color: var(--dim); }
+  .file { display: flex; gap: 6px; padding: 3px 20px; cursor: pointer; }
+  .file:hover { background: #2a2d2e; }
+  .file.on { background: #37373d; }
+  .file b { font-weight: 600; font-size: 11px; width: 16px; text-align: center; }
+  .editor-area { display: flex; min-width: 0; min-height: 0; }
+  .group { display: grid; grid-template-rows: 35px 1fr; flex: 1 1 0; min-width: 0; min-height: 0; position: relative; }
+  .tabs { background: var(--tabs); display: flex; }
+  .tab { padding: 0 14px; display: flex; align-items: center; gap: 6px; color: var(--dim); border-right: 1px solid #252526; cursor: pointer; }
+  .tab.on { background: var(--bg); color: #fff; border-top: 1px solid var(--accent); }
+  .editor { overflow: auto; display: grid; grid-template-columns: 56px 1fr; padding-top: 8px;
+    font: 14px/22px Menlo, Consolas, "SF Mono", monospace; }
+  .gutter { color: #6e7681; text-align: right; padding-right: 18px; user-select: none; }
+  .code { white-space: pre-wrap; padding-right: 40px; }
+  .code ::selection { background: var(--hl); }
+  .code .reading { background: var(--reading); border-radius: 2px; }
+  .md-h { color: var(--h); font-weight: 700; } .md-list { color: var(--list); }
+  .md-code { color: var(--code); } .md-quote { color: var(--dim); font-style: italic; }
+  .ts-kw { color: var(--kw); } .ts-fn { color: var(--fn); } .ts-str { color: var(--str); } .ts-c { color: var(--list); }
+
+  /* The player: sits at the top right of the editor like the find widget. */
+  .player { position: absolute; top: 35px; right: 24px; width: 400px; background: var(--widget);
+    border: 1px solid #454545; border-top: 0; box-shadow: 0 4px 16px rgba(0,0,0,.5); border-radius: 0 0 6px 6px;
+    padding: 10px 12px 12px; transform: translateY(-110%); visibility: hidden; transition: transform .18s ease-out, visibility .18s; z-index: 5; }
+  .player.open { transform: none; visibility: visible; }
+  .player .top { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .player .count { color: var(--dim); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .sentence { background: #1e1e1e; border-radius: 4px; padding: 8px 10px; min-height: 52px; font-size: 13px; color: #e6e6e6; margin-bottom: 8px; }
+  .progress { height: 3px; background: #3c3c3c; border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .controls { display: flex; align-items: center; gap: 4px; }
+  .icon { width: 30px; height: 28px; border: 0; border-radius: 4px; background: none; cursor: pointer; display: grid; place-items: center; color: var(--text); }
+  .icon:hover { background: #3a3d41; }
+  .icon.primary { background: var(--accent); color: #fff; width: 36px; }
+  .icon.primary:hover { background: #1a8ae0; }
+  .icon svg { width: 16px; height: 16px; }
+  .speed { display: flex; align-items: center; gap: 6px; margin-left: 8px; color: var(--dim); font-size: 12px; }
+  .speed input { width: 80px; accent-color: var(--accent); }
+  .speed output { width: 34px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .voice-btn { margin-left: auto; background: var(--input); border: 1px solid transparent; border-radius: 3px; padding: 3px 8px; cursor: pointer; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .voice-btn:hover { border-color: var(--accent); }
+
+  /* Quick pick (command palette style). */
+  .scrim { position: fixed; inset: 0; display: none; z-index: 10; }
+  .scrim.open { display: block; }
+  .quickpick { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: min(560px, 92vw);
+    background: var(--widget); border: 1px solid #454545; border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.6); overflow: hidden; }
+  .quickpick input { width: 100%; background: var(--input); border: 1px solid var(--accent); outline: 0; padding: 6px 8px; margin: 0; }
+  .qp-wrap { padding: 6px; }
+  .qp-list { max-height: 340px; overflow: auto; margin-top: 4px; }
+  .qp-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 3px; cursor: pointer; }
+  .qp-item.on { background: var(--accent-soft); outline: 1px solid var(--accent); }
+  .qp-item small { color: var(--dim); margin-left: auto; white-space: nowrap; }
+  .qp-item .tick { width: 14px; color: var(--accent); }
+  .qp-hint { color: var(--dim); font-size: 12px; padding: 6px 8px 2px; }
+
+  /* Settings tab. */
+  .settings { overflow: auto; padding: 18px 28px; display: none; }
+  .settings.open { display: block; }
+  .settings h1 { font-size: 22px; font-weight: 400; margin: 4px 0 18px; }
+  .setting { padding: 10px 0 14px; max-width: 640px; }
+  .setting .name { font-weight: 600; } .setting .name span { color: var(--dim); font-weight: 400; }
+  .setting p { margin: 4px 0 8px; color: var(--dim); }
+  .setting select, .setting input[type=number] { background: var(--input); border: 1px solid var(--border); padding: 4px 6px; min-width: 260px; }
+  .setting label { display: flex; gap: 8px; align-items: center; }
+
+  .statusbar { background: var(--status); color: #fff; display: flex; align-items: center; font-size: 12px; padding: 0 6px; }
+  .statusbar .item { padding: 0 8px; height: 22px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .statusbar .item:hover { background: rgba(255,255,255,.12); }
+  .statusbar .spacer { flex: 1; }
+  .statusbar svg { width: 14px; height: 14px; }
+  .bars i { display: inline-block; width: 2px; background: #fff; margin-right: 1px; animation: eq .8s infinite ease-in-out; }
+  .bars i:nth-child(2) { animation-delay: .2s; } .bars i:nth-child(3) { animation-delay: .4s; }
+  @keyframes eq { 0%,100% { height: 3px; } 50% { height: 10px; } }
+  .paused .bars i { animation: none; height: 6px; }
+
+  .hint { position: absolute; bottom: 18px; right: 24px; background: var(--widget); border: 1px solid #454545; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: var(--dim); max-width: 290px; z-index: 4; }
+  .hint b { color: var(--text); font-weight: 600; }
+  kbd { background: #3c3c3c; border: 1px solid #555; border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; font: 11px Menlo, monospace; color: #fff; }
+  .menu { position: fixed; background: var(--widget); border: 1px solid #454545; border-radius: 5px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.5); display: none; z-index: 20; min-width: 220px; }
+  .menu div { padding: 4px 20px; border-radius: 3px; display: flex; justify-content: space-between; gap: 24px; cursor: pointer; }
+  .menu div:hover { background: var(--accent); color: #fff; }
+  .menu div.off { color: #6e6e6e; pointer-events: none; }
+  .menu hr { border: 0; border-top: 1px solid #454545; margin: 4px 0; }
+  .toast { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--widget); border: 1px solid #454545; padding: 8px 14px; border-radius: 6px; display: none; z-index: 6; }
+  @media (max-width: 760px) { .main { grid-template-columns: 0 0 1fr; } .with-reader .group:first-child { display: none; } .explorer, .activity { display: none; } .player { right: 8px; width: calc(100% - 16px); } }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+    notes — Visual Studio Code
+  </div>
+
+  <div class="main">
+    <nav class="activity">
+      <button class="on" title="Explorer" data-view="files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg></button>
+      <button title="Read Aloud 2 Me settings" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    </nav>
+    <aside class="explorer">
+      <h2>EXPLORER</h2>
+      <div id="files"></div>
+    </aside>
+    <section class="editor-area" id="editor-area">
+     <div class="group">
+      <div class="tabs" id="tabs"></div>
+      <div class="editor" id="editor"><div class="gutter" id="gutter"></div><div class="code" id="code"></div></div>
+      <div class="settings" id="settings">
+        <h1>Read Aloud 2 Me</h1>
+        <div class="setting"><div class="name">Read Aloud 2 Me: <span>Voice</span></div><p>The voice to read with. Only voices installed on this computer.</p><select id="set-voice"></select></div>
+        <div class="setting"><div class="name">Read Aloud 2 Me: <span>Speed</span></div><p>1 is normal. 0.5 to 2.</p><input id="set-speed" type="number" min="0.5" max="2" step="0.1"></div>
+        <div class="setting"><div class="name">Read Aloud 2 Me: <span>Skip Code Blocks</span></div><label><input id="set-skip" type="checkbox"> In Markdown, skip fenced code blocks.</label></div>
+        <div class="setting"><div class="name">Read Aloud 2 Me: <span>Open Reader</span></div><label><input id="set-reader" type="checkbox"> Open the reader panel each time reading starts.</label></div>
+        <div class="setting"><div class="name">Read Aloud 2 Me: <span>Show Player</span></div><label><input id="set-player" type="checkbox"> Show the player at the top of the editor while reading.</label></div>
+      </div>
+
+      <div class="player" id="player" role="region" aria-label="Read Aloud 2 Me player">
+        <div class="top">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>
+          <strong>Reading aloud</strong>
+          <span class="count" id="count">0 of 0</span>
+        </div>
+        <div class="sentence" id="sentence"></div>
+        <div class="progress"><i id="bar"></i></div>
+        <div class="controls">
+          <button class="icon" id="prev" title="Previous sentence (⌥←)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+          <button class="icon primary" id="play" title="Pause (Space)"></button>
+          <button class="icon" id="next" title="Next sentence (⌥→)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+          <button class="icon" id="stop" title="Stop (Esc)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
+          <div class="speed"><input id="speed" type="range" min="0.5" max="2" step="0.1" aria-label="Speed"><output id="speed-out"></output></div>
+          <button class="voice-btn" id="voice-btn" title="Choose voice"></button>
+          <button class="icon" id="reader-btn" title="Show reader panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"/></svg></button>
+        </div>
+      </div>
+
+      <div class="hint" id="hint">Select any text, then press <b><kbd id="k1">⌘</kbd> <kbd>'</kbd></b>. Press it again or <kbd>Esc</kbd> to stop. Right-click works too. <kbd id="k3">⌘</kbd><kbd>⇧</kbd><kbd>P</kbd> for commands.</div>
+      <div class="toast" id="toast"></div>
+     </div>
+     <div class="group reader" aria-label="Reader">
+      <div class="tabs">
+        <div class="tab on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"/></svg><span id="reader-title">Reader</span>
+          <button class="x" id="reader-close" title="Close reader"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <span class="grow"></span>
+        <div class="tools">
+          <button class="icon" id="text-down" title="Smaller text">A−</button>
+          <button class="icon" id="text-up" title="Larger text">A+</button>
+        </div>
+      </div>
+      <div class="reader-body" id="reader-body"></div>
+     </div>
+    </section>
+  </div>
+
+  <footer class="statusbar">
+    <div class="item">main</div>
+    <div class="spacer"></div>
+    <div class="item" id="status-read" title="Read Aloud 2 Me"></div>
+    <div class="item" id="status-lang">Markdown</div>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="quickpick">
+    <div class="qp-wrap">
+      <input id="qp-input" autocomplete="off" spellcheck="false">
+      <div class="qp-hint" id="qp-hint"></div>
+      <div class="qp-list" id="qp-list" role="listbox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="menu" id="menu">
+  <div data-act="read">Read Aloud <span id="menu-k"></span></div>
+  <hr>
+  <div class="off">Cut</div><div class="off">Copy</div><div class="off">Paste</div>
+</div>
+
+<script>
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = isMac ? "⌘" : "Ctrl";
+const ALT = isMac ? "⌥" : "Alt";
+if (!isMac) { document.getElementById("k1").textContent = "Ctrl"; document.getElementById("k3").textContent = "Ctrl"; }
+const SHORTCUT = isMac ? "⌘'" : "Ctrl+'";
+document.getElementById("menu-k").textContent = SHORTCUT;
+
+const FILES = {
+  "README.md": { lang: "Markdown", text: `# Read Aloud 2 Me
+
+Select any text in VS Code and hear it in your computer's own voice. Nothing leaves your computer.
+
+## How it works
+
+1. Highlight a sentence, a paragraph or a whole section.
+2. Press the shortcut. The player opens and reading starts.
+3. Skip a sentence you don't need, or go back one.
+
+> Tip: change the speed while it reads. The sentence starts again at the new speed.
+
+## Settings
+
+| Setting | Default |
+|---|---|
+| Voice | The system voice |
+| Speed | 1 |
+| Skip code blocks | On |
+
+\`\`\`bash
+npm install read-aloud-2-me
+\`\`\`
+
+Markdown is cleaned first, so you hear **the words**, not the [link addresses](https://example.com) or the \`#\` signs.
+` },
+  "notes.txt": { lang: "Plain Text", text: `Meeting notes, Monday.
+
+We agreed to ship the first version with Mac and Windows. Linux comes later. Each sentence is spoken on its own, so skipping is instant.
+
+Next steps: check which voices the say command can reach. Then try the Windows natural voices from PowerShell.
+` },
+  "extension.ts": { lang: "TypeScript", text: `// Reads the selection aloud, one sentence at a time.
+export function activate(context: vscode.ExtensionContext) {
+  const reader = new Reader();
+  context.subscriptions.push(
+    vscode.commands.registerCommand("readAloud2Me.toggle", () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      reader.toggle(editor.document.getText(editor.selection));
+    }),
+  );
+}
+` },
+};
+
+const state = {
+  file: "README.md", voices: [], voiceURI: null, rate: 1, skipCode: true, showPlayer: true,
+  openReader: false, readerOpen: false, textSize: 16,
+  sentences: [], paras: [], index: 0, playing: false, active: false, token: 0,
+};
+try { Object.assign(state, JSON.parse(localStorage.getItem("ra2m") || "{}"), { sentences: [], paras: [], index: 0, playing: false, active: false, token: 0 }); } catch (_) {}
+function save() {
+  const { voiceURI, rate, skipCode, showPlayer, openReader, readerOpen, textSize, file } = state;
+  try { localStorage.setItem("ra2m", JSON.stringify({ voiceURI, rate, skipCode, showPlayer, openReader, readerOpen, textSize, file })); } catch (_) {}
+}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ---------- Editor ---------- */
+function colourLine(line, lang) {
+  const e = esc(line);
+  if (lang === "Markdown") {
+    if (/^#{1,6}\s/.test(line)) return `<span class="md-h">${e}</span>`;
+    if (/^(\d+\.|[-*+])\s/.test(line)) return e.replace(/^(\d+\.|[-*+])/, '<span class="md-list">$1</span>');
+    if (/^>/.test(line)) return `<span class="md-quote">${e}</span>`;
+    if (/^(```|\|)/.test(line)) return `<span class="md-code">${e}</span>`;
+    return e.replace(/`([^`]+)`/g, '<span class="md-code">`$1`</span>');
+  }
+  if (lang === "TypeScript") {
+    if (/^\s*\/\//.test(line)) return `<span class="ts-c">${e}</span>`;
+    return e.replace(/"[^"]*"/g, (m) => `<span class="ts-str">${m}</span>`)
+      .replace(/\b(export|function|const|return|if|new)\b/g, '<span class="ts-kw">$1</span>')
+      .replace(/\b(activate|registerCommand|getText|toggle|push)\b/g, '<span class="ts-fn">$1</span>');
+  }
+  return e;
+}
+function renderFiles() {
+  const names = Object.keys(FILES);
+  $("files").innerHTML = names.map((n) => `<div class="file ${n === state.file ? "on" : ""}" data-file="${n}"><b style="color:${n.endsWith(".md") ? "#519aba" : n.endsWith(".ts") ? "#3178c6" : "#aaa"}">${n.endsWith(".md") ? "M" : n.endsWith(".ts") ? "TS" : "≡"}</b>${n}</div>`).join("");
+  $("tabs").innerHTML = names.map((n) => `<div class="tab ${n === state.file && !settingsOpen ? "on" : ""}" data-file="${n}">${n}</div>`).join("") +
+    (settingsOpen ? `<div class="tab on">Settings</div>` : "");
+  const { text, lang } = FILES[state.file];
+  const lines = text.replace(/\n$/, "").split("\n");
+  $("gutter").innerHTML = lines.map((_, i) => `<div>${i + 1}</div>`).join("");
+  $("code").innerHTML = lines.map((l) => `<div>${colourLine(l, lang) || "&#8203;"}</div>`).join("");
+  $("status-lang").textContent = lang;
+}
+let settingsOpen = false;
+function showSettings(open) {
+  settingsOpen = open;
+  $("editor").style.display = open ? "none" : "";
+  $("settings").classList.toggle("open", open);
+  document.querySelectorAll(".activity button").forEach((b) => b.classList.toggle("on", (b.dataset.view === "settings") === open));
+  renderFiles(); syncSettings();
+}
+document.addEventListener("click", (e) => {
+  const f = e.target.closest("[data-file]");
+  if (f) { state.file = f.dataset.file; save(); showSettings(false); }
+  const v = e.target.closest("[data-view]");
+  if (v) showSettings(v.dataset.view === "settings");
+});
+
+/* ---------- Markdown to speech ---------- */
+function markdownToSpeech(text, skipCode) {
+  let out = text.replace(/\r\n?/g, "\n");
+  out = out.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, (b) => skipCode ? "\n" : b.split("\n").slice(1, -1).join("\n"));
+  out = out
+    .replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?[a-zA-Z][^>]*>/g, "")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/<?https?:\/\/[^\s>)]+>?/g, "")
+    .replace(/^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/gm, "$1.")
+    .replace(/^\s*>+\s?/gm, "").replace(/^\s*[-*+]\s+(\[[ xX]\]\s+)?/gm, "").replace(/^\s*\d+[.)]\s+/gm, "")
+    .replace(/^\s*([-*_])(\s*\1){2,}\s*$/gm, "")
+    .replace(/^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*\|?\s*$/gm, "")
+    .replace(/^\s*\|(.*)\|\s*$/gm, (_, row) => row.split("|").map((c) => c.trim()).filter(Boolean).join(", ") + ".")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/(\*|_)(\S(?:.*?\S)?)\1/g, "$2")
+    .replace(/~~(.+?)~~/g, "$1").replace(/`([^`]+)`/g, "$1");
+  return out.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => /[.!?:;,]$/.test(l) ? l : l + ".").join("\n");
+}
+function toSentences(text) {
+  if (window.Intl && Intl.Segmenter) {
+    return [...new Intl.Segmenter(navigator.language || "en", { granularity: "sentence" }).segment(text)].map((s) => s.segment.trim()).filter(Boolean);
+  }
+  return text.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g)?.map((s) => s.trim()) ?? [];
+}
+
+/* ---------- Voices ---------- */
+const synth = window.speechSynthesis;
+function loadVoices() {
+  if (!synth) return;
+  const lang = (navigator.language || "en").slice(0, 2);
+  state.voices = synth.getVoices().filter((v) => v.localService)
+    .sort((a, b) => (b.lang.startsWith(lang) - a.lang.startsWith(lang)) || (quality(b) - quality(a)) || a.name.localeCompare(b.name));
+  if (!state.voices.find((v) => v.voiceURI === state.voiceURI)) {
+    state.voiceURI = (state.voices.find((v) => v.default && v.lang.startsWith(lang)) || state.voices.find((v) => v.lang.startsWith(lang)) || state.voices[0])?.voiceURI ?? null;
+  }
+  syncSettings(); renderPlayer();
+}
+function quality(v) { return /premium/i.test(v.name) ? 2 : /enhanced|natural|neural/i.test(v.name) ? 1 : 0; }
+function voice() { return state.voices.find((v) => v.voiceURI === state.voiceURI) || null; }
+function voiceLabel(v) { return v ? v.name.replace(/^Microsoft\s+/, "").replace(/\s+-\s+.*$/, "") : "System voice"; }
+
+
+/* ---------- Reading ---------- */
+function speakCurrent() {
+  if (!synth) { toast("This browser has no speech. Try Chrome, Edge or Safari."); return; }
+  const token = ++state.token;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(state.sentences[state.index]);
+  const v = voice(); if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = state.rate;
+  u.onend = () => {
+    if (token !== state.token || !state.playing) return;
+    if (state.index < state.sentences.length - 1) { state.index++; speakCurrent(); }
+    else stop();
+  };
+  u.onerror = (e) => { if (token === state.token && e.error !== "interrupted" && e.error !== "canceled") toast("Couldn't read with this voice: " + e.error); };
+  synth.speak(u);
+  renderPlayer();
+}
+function start(text) {
+  const clean = FILES[state.file].lang === "Markdown"
+    ? markdownToSpeech(text, state.skipCode)
+    : text.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
+  const sentences = [], paras = [];
+  clean.split("\n").forEach((p, i) => toSentences(p).forEach((s) => { sentences.push(s); paras.push(i); }));
+  if (!sentences.length) { toast("Nothing to read in the selection."); return; }
+  Object.assign(state, { sentences, paras, index: 0, playing: true, active: true, readFile: state.file });
+  if (state.openReader) setReader(true);
+  renderReader();
+  speakCurrent();
+}
+function stop() {
+  state.token++; synth?.cancel();
+  Object.assign(state, { playing: false, active: false });
+  renderPlayer();
+}
+
+/* ---------- Reader panel ---------- */
+function setReader(open) { state.readerOpen = open; save(); $("editor-area").classList.toggle("with-reader", open); renderReader(); }
+function renderReader() {
+  const body = $("reader-body");
+  $("reader-title").textContent = "Reader: " + (state.readFile || state.file);
+  body.style.fontSize = state.textSize + "px";
+  if (!state.sentences.length) {
+    body.innerHTML = `<div class="reader-empty">Select text and press ${SHORTCUT}. The text shows here, clean and easy to follow, with the sentence being read lit up. Click any sentence to read from there.</div>`;
+    return;
+  }
+  let html = "", p = -1;
+  state.sentences.forEach((s, i) => {
+    if (state.paras[i] !== p) { if (p !== -1) html += "</p>"; html += "<p>"; p = state.paras[i]; }
+    html += `<span class="s" data-s="${i}">${esc(s)}</span> `;
+  });
+  body.innerHTML = html + "</p>";
+  markReader();
+}
+function markReader() {
+  const body = $("reader-body");
+  body.querySelectorAll(".s").forEach((el) => {
+    const i = +el.dataset.s;
+    el.classList.toggle("now", state.active && i === state.index);
+    el.classList.toggle("done", state.active && i < state.index);
+  });
+  body.querySelector(".now")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+$("reader-body").onclick = (e) => {
+  const el = e.target.closest("[data-s]"); if (!el) return;
+  state.index = +el.dataset.s;
+  state.active = true; state.playing = true;
+  speakCurrent();
+};
+$("reader-btn").onclick = () => setReader(!state.readerOpen);
+$("reader-close").onclick = () => setReader(false);
+$("text-up").onclick = () => { state.textSize = Math.min(24, state.textSize + 1); save(); renderReader(); };
+$("text-down").onclick = () => { state.textSize = Math.max(12, state.textSize - 1); save(); renderReader(); };
+function togglePause() {
+  if (!state.active) return;
+  if (state.playing) { state.playing = false; state.token++; synth.cancel(); renderPlayer(); }
+  else { state.playing = true; speakCurrent(); }
+}
+function jump(delta) {
+  if (!state.active) return;
+  state.index = Math.max(0, Math.min(state.sentences.length - 1, state.index + delta));
+  if (state.playing) speakCurrent(); else renderPlayer();
+}
+function readSelection() {
+  if (state.active) { stop(); return; }
+  const sel = window.getSelection();
+  const text = sel && $("code").contains(sel.anchorNode) ? sel.toString() : "";
+  if (!text.trim()) { toast("Select some text first."); return; }
+  start(text);
+}
+
+/* ---------- Player and status bar ---------- */
+const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>';
+const PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+function renderPlayer() {
+  const n = state.sentences.length;
+  $("player").classList.toggle("open", state.active && state.showPlayer);
+  $("count").textContent = n ? `${state.index + 1} of ${n}` : "0 of 0";
+  $("sentence").textContent = state.sentences[state.index] || "";
+  $("bar").style.width = n ? `${((state.index + 1) / n) * 100}%` : "0";
+  $("play").innerHTML = state.playing ? PAUSE : PLAY;
+  $("play").title = state.playing ? "Pause (Space)" : "Resume (Space)";
+  $("prev").disabled = state.index === 0;
+  $("speed").value = state.rate; $("speed-out").textContent = state.rate.toFixed(1) + "×";
+  $("voice-btn").textContent = voiceLabel(voice());
+  const s = $("status-read");
+  s.classList.toggle("paused", state.active && !state.playing);
+  s.innerHTML = state.active
+    ? `<span class="bars"><i></i><i></i><i></i></span> ${state.playing ? "Reading" : "Paused"} ${state.index + 1}/${n} · ${esc(voiceLabel(voice()))} · ${state.rate.toFixed(1)}×`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg> Read Aloud`;
+  s.title = state.active ? "Click to stop" : `Read selection (${SHORTCUT})`;
+  $("hint").style.display = state.active ? "none" : "";
+  $("reader-btn").style.color = state.readerOpen ? "#fff" : "";
+  $("reader-btn").title = state.readerOpen ? "Hide reader panel" : "Show reader panel";
+  markReader();
+}
+$("play").onclick = togglePause;
+$("stop").onclick = stop;
+$("prev").onclick = () => jump(-1);
+$("next").onclick = () => jump(1);
+$("speed").oninput = (e) => setRate(+e.target.value);
+$("voice-btn").onclick = () => openVoicePicker();
+$("status-read").onclick = () => state.active ? stop() : readSelection();
+
+function setRate(r) {
+  state.rate = Math.round(Math.min(2, Math.max(0.5, r)) * 10) / 10; save();
+  if (state.active && state.playing) speakCurrent(); else renderPlayer();
+  syncSettings();
+}
+function setVoice(uri) {
+  state.voiceURI = uri; save();
+  if (state.active && state.playing) speakCurrent(); else renderPlayer();
+  syncSettings();
+}
+
+/* ---------- Settings ---------- */
+function syncSettings() {
+  $("set-voice").innerHTML = state.voices.map((v) => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === state.voiceURI ? "selected" : ""}>${esc(v.name)} (${v.lang})</option>`).join("") || "<option>No local voices found</option>";
+  $("set-speed").value = state.rate;
+  $("set-skip").checked = state.skipCode;
+  $("set-player").checked = state.showPlayer;
+  $("set-reader").checked = state.openReader;
+}
+$("set-reader").onchange = (e) => { state.openReader = e.target.checked; save(); };
+$("set-voice").onchange = (e) => setVoice(e.target.value);
+$("set-speed").onchange = (e) => setRate(+e.target.value);
+$("set-skip").onchange = (e) => { state.skipCode = e.target.checked; save(); };
+$("set-player").onchange = (e) => { state.showPlayer = e.target.checked; save(); renderPlayer(); };
+
+/* ---------- Quick pick ---------- */
+let qp = { items: [], on: 0, mode: "commands" };
+const COMMANDS = [
+  { label: "Read Aloud 2 Me: Read Selection", key: SHORTCUT, run: () => readSelection() },
+  { label: "Read Aloud 2 Me: Pick Voice", run: () => openVoicePicker() },
+  { label: "Read Aloud 2 Me: Toggle Reader Panel", run: () => setReader(!state.readerOpen) },
+  { label: "Read Aloud 2 Me: Faster", key: ALT + "+", run: () => setRate(state.rate + 0.1) },
+  { label: "Read Aloud 2 Me: Slower", key: ALT + "−", run: () => setRate(state.rate - 0.1) },
+  { label: "Read Aloud 2 Me: Next Sentence", key: ALT + "→", run: () => jump(1) },
+  { label: "Read Aloud 2 Me: Previous Sentence", key: ALT + "←", run: () => jump(-1) },
+  { label: "Read Aloud 2 Me: Stop", key: "Esc", run: () => stop() },
+  { label: "Read Aloud 2 Me: Open Settings", run: () => showSettings(true) },
+];
+function openPalette() {
+  qp = { mode: "commands", on: 0, items: [] };
+  $("qp-input").placeholder = "Type a command";
+  $("qp-input").value = ">Read Aloud 2 Me";
+  $("qp-hint").textContent = "";
+  filterQp(); $("scrim").classList.add("open"); $("qp-input").focus();
+}
+function openVoicePicker() {
+  qp = { mode: "voices", on: Math.max(0, state.voices.findIndex((v) => v.voiceURI === state.voiceURI)), items: [] };
+  $("qp-input").value = "";
+  $("qp-input").placeholder = "Pick a voice. Arrow keys play a sample.";
+  $("qp-hint").textContent = state.voices.length ? `${state.voices.length} voices on this computer` : "No local voices found. Add voices in your system settings.";
+  filterQp(true); $("scrim").classList.add("open"); $("qp-input").focus();
+}
+function filterQp(keepOn) {
+  const q = $("qp-input").value.replace(/^>/, "").trim().toLowerCase();
+  if (qp.mode === "commands") qp.items = COMMANDS.filter((c) => c.label.toLowerCase().includes(q.replace(/^read aloud 2 me:?\s*/, "")) || c.label.toLowerCase().includes(q));
+  else qp.items = state.voices.filter((v) => (v.name + " " + v.lang).toLowerCase().includes(q));
+  if (!keepOn) qp.on = 0;
+  qp.on = Math.min(qp.on, Math.max(0, qp.items.length - 1));
+  $("qp-list").innerHTML = qp.items.map((it, i) => qp.mode === "commands"
+    ? `<div class="qp-item ${i === qp.on ? "on" : ""}" data-i="${i}">${esc(it.label)}<small>${it.key ? esc(it.key) : ""}</small></div>`
+    : `<div class="qp-item ${i === qp.on ? "on" : ""}" data-i="${i}"><span class="tick">${it.voiceURI === state.voiceURI ? "✓" : ""}</span>${esc(voiceLabel(it))}<small>${esc(it.lang)}${quality(it) ? " · " + (quality(it) === 2 ? "Premium" : "High quality") : ""}</small></div>`).join("");
+  $("qp-list").querySelector(".on")?.scrollIntoView({ block: "nearest" });
+}
+function closeQp() { $("scrim").classList.remove("open"); if (qp.mode === "voices" && !state.active) synth?.cancel(); }
+function pickQp(i) {
+  const it = qp.items[i]; if (!it) return;
+  closeQp();
+  if (qp.mode === "commands") it.run(); else { setVoice(it.voiceURI); toast(`Voice: ${voiceLabel(it)}`); }
+}
+function sample(v) {
+  if (!synth || state.active) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(`Hello, I'm ${voiceLabel(v)}.`); u.voice = v; u.lang = v.lang; u.rate = state.rate;
+  synth.speak(u);
+}
+$("qp-input").oninput = () => filterQp();
+$("qp-input").onkeydown = (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    qp.on = (qp.on + (e.key === "ArrowDown" ? 1 : -1) + qp.items.length) % Math.max(1, qp.items.length);
+    filterQp(true);
+    if (qp.mode === "voices" && qp.items[qp.on]) sample(qp.items[qp.on]);
+  } else if (e.key === "Enter") { e.preventDefault(); pickQp(qp.on); }
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeQp(); }
+};
+$("qp-list").onclick = (e) => { const it = e.target.closest("[data-i]"); if (it) pickQp(+it.dataset.i); };
+$("scrim").onclick = (e) => { if (e.target === $("scrim")) closeQp(); };
+
+/* ---------- Context menu ---------- */
+$("code").addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const m = $("menu");
+  m.firstElementChild.classList.toggle("off", !window.getSelection().toString().trim());
+  m.style.display = "block";
+  m.style.left = Math.min(e.clientX, innerWidth - 240) + "px";
+  m.style.top = Math.min(e.clientY, innerHeight - 160) + "px";
+});
+document.addEventListener("mousedown", (e) => { if (!e.target.closest("#menu")) $("menu").style.display = "none"; });
+$("menu").onclick = (e) => { if (e.target.closest("[data-act=read]")) { $("menu").style.display = "none"; readSelection(); } };
+
+/* ---------- Shortcuts ---------- */
+document.addEventListener("keydown", (e) => {
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if ($("scrim").classList.contains("open")) return;
+  if (mod && !e.altKey && !e.shiftKey && (e.key === "'" || e.code === "Quote")) { e.preventDefault(); readSelection(); return; }
+  if (mod && e.shiftKey && e.code === "KeyP") { e.preventDefault(); openPalette(); return; }
+  if (!state.active) return;
+  if (e.key === "Escape") { e.preventDefault(); stop(); }
+  else if (e.code === "Space" && !e.target.closest("input,select")) { e.preventDefault(); togglePause(); }
+  else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); jump(1); }
+  else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); jump(-1); }
+  else if (e.altKey && (e.code === "Equal" || e.code === "NumpadAdd")) { e.preventDefault(); setRate(state.rate + 0.1); }
+  else if (e.altKey && (e.code === "Minus" || e.code === "NumpadSubtract")) { e.preventDefault(); setRate(state.rate - 0.1); }
+});
+
+let toastTimer;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.style.display = "none"), 2200); }
+
+renderFiles(); syncSettings(); setReader(state.readerOpen); renderPlayer();
+if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "include": ["out/text/**", "out/session/**", "out/speech/**", "out/reader/messages.js"],
+  "reporter": ["text-summary", "text"],
+  "check-coverage": true,
+  "lines": 90,
+  "branches": 85,
+  "functions": 90
+}

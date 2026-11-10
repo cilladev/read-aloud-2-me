@@ -1,0 +1,124 @@
+/*
+ * Reader panel styles. Colours come only from VS Code theme variables so every theme works.
+ * Must not load remote fonts or hard-code colours.
+ */
+
+:root {
+  --reader-font-size: 16px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 20px;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+}
+
+.toolbar .title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.toolbar .size {
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toolbar .size:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.toolbar .size:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.content {
+  max-width: 70ch;
+  padding: 14px 20px 40px;
+  font-size: var(--reader-font-size);
+  line-height: 1.6;
+}
+
+.content p {
+  margin: 0 0 0.9em;
+}
+
+.content .empty {
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.s {
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+  padding: 1px 2px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    opacity 0.15s ease-out;
+}
+
+.s:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.s.done {
+  opacity: 0.55;
+}
+
+.s.now {
+  background: var(--vscode-editor-findMatchHighlightBackground);
+  border-left-color: var(--vscode-focusBorder);
+}
+
+.s mark {
+  background: var(--vscode-editor-findMatchBackground);
+  color: inherit;
+  border-radius: 2px;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.s:focus {
+  outline: none;
+}
+
+.s:focus-visible,
+.toolbar .size:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s {
+    transition: none;
+  }
+}

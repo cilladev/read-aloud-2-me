@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "module": "node20",
+    "moduleResolution": "node16",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node", "mocha"],
+    "rootDir": "src",
+    "outDir": "out",
+    "sourceMap": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
