@@ -14,8 +14,8 @@ import type { HostEvent, HostRequest, HostVoice } from "./windows-protocol";
 import { WindowsRun } from "./windows-run";
 import type { RunControl } from "./windows-run";
 
-/** How long `listVoices` waits for the host before failing. */
-export const VOICES_TIMEOUT_MS = 10_000;
+/** How long `listVoices` waits for the host before failing. Includes PowerShell start-up, which took over 10 s on a busy CI machine. */
+export const VOICES_TIMEOUT_MS = 30_000;
 
 /** Optional knobs for {@link WindowsSapiEngine}. */
 export interface WindowsEngineOptions {
